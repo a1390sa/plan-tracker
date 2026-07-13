@@ -34,7 +34,8 @@ export default function PlansList({ me, onOpen }) {
     try {
       const { parsed, file } = preview;
       // 1) رفع الملف الأصلي إلى المخزن
-      const path = `${me.id}/${Date.now()}_${file.name}`;
+     const safeName = file.name.replace(/[^\w.\-]/g, "_") || "plan.xlsx";
+      const path = `${me.id}/${Date.now()}_${safeName}`;
       const up = await supabase.storage.from("plans").upload(path, file);
       if (up.error) throw up.error;
       // 2) إنشاء الخطة
