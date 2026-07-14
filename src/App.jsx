@@ -18,7 +18,7 @@ export default function App() {
   useEffect(() => {
     if (!session) { setProfile(null); return; }
     supabase.from("profiles").select("*").eq("id", session.user.id).single()
-      .then(({ data }) => setProfile(data));
+    .then(({ data }) => setProfile(data ?? { id: session.user.id, name: session.user.email, email: session.user.email, is_admin: false }));
   }, [session]);
 
   if (session === undefined) return <div className="center-page mut">جارٍ التحميل…</div>;
