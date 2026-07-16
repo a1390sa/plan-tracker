@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase.js";
 import { parseWorkbook } from "../lib/parser.js";
+import { currentMonthOf, aggregates } from "../lib/compute.js";
 
 export default function PlansList({ me, onOpen }) {
   const [plans, setPlans] = useState(null);
@@ -13,7 +14,9 @@ export default function PlansList({ me, onOpen }) {
 
   const load = async () => {
     const { data, error } = await supabase
-      .from("plans").select("*, indicators(count)").order("created_at", { ascending: false });
+      .from("plans")
+      .select("*, indicators(id, tasks(id, month_no, status))")
+      .order("created_at", { ascending: false });
     if (error) setErr(error.message);
     setPlans(data || []);
   };
@@ -33,8 +36,8 @@ export default function PlansList({ me, onOpen }) {
     setBusy(true); setErr("");
     try {
       const { parsed, file } = preview;
-      // 1) رفع الملف الأصلي إلى المخزن
-     const safeName = file.name.replace(/[^\w.\-]/g, "_") || "plan.xlsx";
+      // 1) رفع الملف الأصلي إلى المخزن (باسم آمن)
+      const safeName = file.name.replace(/[^\w.\-]/g, "_") || "plan.xlsx";
       const path = `${me.id}/${Date.now()}_${safeName}`;
       const up = await supabase.storage.from("plans").upload(path, file);
       if (up.error) throw up.error;
@@ -65,6 +68,24 @@ export default function PlansList({ me, onOpen }) {
       onOpen(plan.id);
     } catch (e) { setErr(e.message); }
     finally { setBusy(false); }
+  };
+
+  const removePlan = async (p) => {
+    const sure = window.confirm(
+      `تحذير: سيُحذف نهائياً كل ما يخص الخطة «${p.name}» — المؤشرات والمهام والإسنادات وسجل التغييرات — ولا يمكن التراجع.\n\nهل أنت متأكد من الحذف؟`
+    );
+    if (!sure) return;
+    setErr("");
+    try {
+      if (p.source_path) await supabase.storage.from("plans").remove([p.source_path]);
+      const { error } = await supabase.from("plans").delete().eq("id", p.id);
+      if (error) throw error;
+      await load();
+    } catch (e) {
+      setErr(e.message.includes("row-level security")
+        ? "لا تملك صلاحية حذف هذه الخطة — الحذف لصاحب الخطة فقط."
+        : e.message);
+    }
   };
 
   return (
@@ -110,15 +131,35 @@ export default function PlansList({ me, onOpen }) {
         <div className="card" style={{ textAlign: "center", color: "var(--mut)" }}>
           لا توجد خطط بعد — ارفع أول خطة لتبدأ المتابعة.
         </div>
-      ) : plans.map((p) => (
-        <div key={p.id} className="card row" style={{ justifyContent: "space-between", cursor: "pointer" }} onClick={() => onOpen(p.id)}>
-          <div>
-            <div style={{ fontWeight: 700 }}>{p.name}</div>
-            <div className="mut">{p.months_count} شهراً · تبدأ {p.start_month}/{p.start_year}</div>
+      ) : plans.map((p) => {
+        const tasks = (p.indicators || []).flatMap((i) => i.tasks || []);
+        const cur = currentMonthOf(p);
+        const ag = aggregates(tasks, cur);
+        const clr = ag.late ? "var(--red)" : ag.now ? "var(--amber)" : ag.pct === 100 && ag.total ? "var(--teal)" : "var(--teal-mid)";
+        return (
+          <div key={p.id} className="card" style={{ cursor: "pointer", borderRight: `5px solid ${clr}` }} onClick={() => onOpen(p.id)}>
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <div className="grow">
+                <div style={{ fontWeight: 700 }}>{p.name}</div>
+                <div className="mut">{p.months_count} شهراً · تبدأ {p.start_month}/{p.start_year} · الشهر الجاري: {cur}</div>
+              </div>
+              <div className="row" style={{ gap: 6 }}>
+                <button className="btn btn-ghost" onClick={(e) => { e.stopPropagation(); onOpen(p.id); }}>فتح ←</button>
+                <button className="btn btn-ghost" style={{ color: "var(--red)" }}
+                  title="حذف الخطة نهائياً"
+                  onClick={(e) => { e.stopPropagation(); removePlan(p); }}>حذف</button>
+              </div>
+            </div>
+            <div className="row" style={{ marginTop: 10 }}>
+              <div className="progress"><div style={{ width: `${ag.pct}%`, background: clr }} /></div>
+              <span style={{ fontWeight: 700, fontSize: 13, color: clr }}>{ag.pct}%</span>
+              <span className="mut">المحقق {ag.done} من {ag.total}</span>
+              {ag.late > 0 && <span className="badge b-late">{ag.late} متأخرة</span>}
+              {ag.now > 0 && <span className="badge b-now">{ag.now} مستحقة هذا الشهر</span>}
+            </div>
           </div>
-          <span className="btn btn-ghost">فتح ←</span>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }
