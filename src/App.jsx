@@ -3,11 +3,13 @@ import { supabase } from "./lib/supabase.js";
 import Auth from "./views/Auth.jsx";
 import PlansList from "./views/PlansList.jsx";
 import PlanDashboard from "./views/PlanDashboard.jsx";
+import Analytics from "./views/Analytics.jsx";
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = جارٍ التحقق
   const [profile, setProfile] = useState(null);
   const [openPlan, setOpenPlan] = useState(null);
+  const [view, setView] = useState("plans"); // plans | analytics
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
@@ -18,7 +20,7 @@ export default function App() {
   useEffect(() => {
     if (!session) { setProfile(null); return; }
     supabase.from("profiles").select("*").eq("id", session.user.id).single()
-    .then(({ data }) => setProfile(data ?? { id: session.user.id, name: session.user.email, email: session.user.email, is_admin: false }));
+      .then(({ data }) => setProfile(data ?? { id: session.user.id, name: session.user.email, email: session.user.email, is_admin: false }));
   }, [session]);
 
   if (session === undefined) return <div className="center-page mut">جارٍ التحميل…</div>;
@@ -35,14 +37,23 @@ export default function App() {
           </div>
         </div>
         <div className="row">
-          {openPlan && <button className="btn btn-ghost" onClick={() => setOpenPlan(null)}>← كل الخطط</button>}
+          {openPlan ? (
+            <button className="btn btn-ghost" onClick={() => setOpenPlan(null)}>← كل الخطط</button>
+          ) : (
+            <div className="tabs">
+              <button className={`tab ${view === "plans" ? "on" : ""}`} onClick={() => setView("plans")}>خططي</button>
+              <button className={`tab ${view === "analytics" ? "on" : ""}`} onClick={() => setView("analytics")}>لوحة التحكم</button>
+            </div>
+          )}
           <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>تسجيل الخروج</button>
         </div>
       </div>
 
       {openPlan
         ? <PlanDashboard planId={openPlan} me={profile} onBack={() => setOpenPlan(null)} />
-        : <PlansList me={profile} onOpen={setOpenPlan} />}
+        : view === "analytics"
+          ? <Analytics me={profile} />
+          : <PlansList me={profile} onOpen={setOpenPlan} />}
     </div>
   );
 }
