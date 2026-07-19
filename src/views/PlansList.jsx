@@ -59,7 +59,7 @@ export default function PlansList({ me, onOpen }) {
       const taskRows = [];
       parsed.indicators.forEach((i) => {
         const iid = byName[i.name + "|" + i.sort];
-        i.tasks.forEach((t) => taskRows.push({ indicator_id: iid, month_no: t.month, description: t.desc }));
+        i.tasks.forEach((t) => taskRows.push({ indicator_id: iid, month_no: t.month, description: t.desc, status: t.done ? "done" : "pending", completed_at: t.done ? new Date().toISOString() : null }));
       });
       const { error: te } = await supabase.from("tasks").insert(taskRows);
       if (te) throw te;
