@@ -36,20 +36,24 @@ export default function PlansList({ me, onOpen }) {
     setBusy(true); setErr("");
     try {
       const { parsed, file } = preview;
+      // 0) الهوية من الجلسة الحية (تضمن مطابقة owner_id لصاحب الجلسة)
+      const { data: auth, error: ae } = await supabase.auth.getUser();
+      if (ae || !auth?.user) throw new Error("انتهت الجلسة — سجّل الخروج ثم الدخول مجدداً.");
+      const uid = auth.user.id;
       // 1) رفع الملف الأصلي إلى المخزن (باسم آمن)
       const safeName = file.name.replace(/[^\w.\-]/g, "_") || "plan.xlsx";
-      const path = `${me.id}/${Date.now()}_${safeName}`;
+      const path = `${uid}/${Date.now()}_${safeName}`;
       const up = await supabase.storage.from("plans").upload(path, file);
       if (up.error) throw up.error;
       // 2) إنشاء الخطة
       const { data: plan, error: pe } = await supabase.from("plans").insert({
         name: parsed.name, months_count: parsed.months,
         start_year: Number(startYear), start_month: Number(startMonth),
-        owner_id: me.id, source_path: path,
+        owner_id: uid, source_path: path,
       }).select().single();
       if (pe) throw pe;
       // 3) عضوية المالك كمدير
-      await supabase.from("plan_members").insert({ plan_id: plan.id, user_id: me.id, role: "manager" });
+      await supabase.from("plan_members").insert({ plan_id: plan.id, user_id: uid, role: "manager" });
       // 4) المؤشرات ثم المهام
       const { data: inds, error: ie } = await supabase.from("indicators").insert(
         parsed.indicators.map((i) => ({ plan_id: plan.id, name: i.name, total_target: i.target, sort_order: i.sort }))
@@ -66,7 +70,11 @@ export default function PlansList({ me, onOpen }) {
       setPreview(null);
       await load();
       onOpen(plan.id);
-    } catch (e) { setErr(e.message); }
+    } catch (e) {
+      setErr(e.message?.includes("row-level security")
+        ? "الجلسة غير متطابقة مع الحساب — سجّل الخروج ثم الدخول مجدداً وأعد المحاولة."
+        : e.message);
+    }
     finally { setBusy(false); }
   };
 
@@ -109,6 +117,12 @@ export default function PlansList({ me, onOpen }) {
           <div className="mut" style={{ marginBottom: 8 }}>
             {preview.parsed.indicators.length} مؤشرات · {preview.parsed.indicators.reduce((a, i) => a + i.tasks.length, 0)} مهمة · {preview.parsed.months} شهراً
           </div>
+          {preview.parsed.indicators.reduce((a, i) => a + i.tasks.length, 0) === 0 && (
+            <div className="alert-err" style={{ marginBottom: 10 }}>
+              ⚠ لم يُعثر على أي مهمة في هذا الملف — لا فائدة من رفعه بهذه الحال.
+              تأكد أن صفوف المهام معنونة في عمود «التنفيذ» بكلمة «المهام» أو «المهمة»، وأن المستهدفات الشهرية أرقام.
+            </div>
+          )}
           {preview.parsed.warnings.length > 0 && (
             <div className="alert-warn" style={{ marginBottom: 10 }}><b>ملاحظات التحقق:</b> {preview.parsed.warnings.join(" · ")}</div>
           )}
@@ -121,7 +135,9 @@ export default function PlansList({ me, onOpen }) {
             </select>
           </div>
           <div className="row">
-            <button className="btn btn-primary" disabled={busy} onClick={commit}>{busy ? "جارٍ الاعتماد…" : "اعتماد ورفع"}</button>
+            <button className="btn btn-primary"
+              disabled={busy || preview.parsed.indicators.reduce((a, i) => a + i.tasks.length, 0) === 0}
+              onClick={commit}>{busy ? "جارٍ الاعتماد…" : "اعتماد ورفع"}</button>
             <button className="btn btn-ghost" onClick={() => setPreview(null)}>إلغاء</button>
           </div>
         </div>
