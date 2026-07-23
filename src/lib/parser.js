@@ -59,12 +59,18 @@ function detectMonths(rows, headerRow, labelCol) {
   return months;
 }
 
+// قاموس المسمّيات المقبولة لصفوف الكتلة (يستوعب اختلاف القوالب بين الأقسام)
+const T_TARGET = ["المستهدف الشهري", "المستهدف الرقمي", "المستهدف العددي", "المستهدف الكمي"];
+const T_TASKS  = ["المهام", "المهمة", "المستهدف التنفيذي", "الإجراءات", "الإجراء", "الأنشطة", "النشاط", "الأعمال"];
+const T_DONE   = ["المحقق", "المتحقق", "المنجز"];
+const T_PCT    = ["النسبة", "نسبة الإنجاز", "النسبة المئوية"];
+
 const LBL = (s) => {
   s = clean(s);
-  if (s === "المستهدف الشهري") return "target";
-  if (s === "المهام" || s === "المهمة") return "tasks";
-  if (s === "المحقق") return "done";
-  if (s === "النسبة") return "pct";
+  if (T_TARGET.includes(s)) return "target";
+  if (T_TASKS.includes(s)) return "tasks";
+  if (T_DONE.includes(s)) return "done";
+  if (T_PCT.includes(s)) return "pct";
   return s ? "other" : "";
 };
 
