@@ -8,13 +8,14 @@ const AR_MONTHS = { "يناير":1,"فبراير":2,"مارس":3,"أبريل":4,
 const clean = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
 
 function monthFromHeader(v) {
-  if (typeof v === "number" && v >= 1 && v <= 12) return v;
+  // رقم تسلسلي للشهر (يدعم 1..60 لخطط متعددة السنوات)
+  if (typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 60) return v;
   const s = clean(v);
   if (!s) return null;
-  const digits = s.match(/\d+/);
-  for (const [name, n] of Object.entries(AR_MONTHS))
-    if (s.includes(name)) return digits ? Math.min(Number(digits[0]), 12) || n : n;
-  if (/^\d{1,2}$/.test(s)) { const n = Number(s); if (n >= 1 && n <= 12) return n; }
+  // اسم شهر هجري/ميلادي
+  for (const [name, n] of Object.entries(AR_MONTHS)) if (s.includes(name)) return n;
+  // نص رقمي بحت
+  if (/^\d{1,2}$/.test(s)) { const n = Number(s); if (n >= 1 && n <= 60) return n; }
   return null;
 }
 
