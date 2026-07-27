@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase.js";
 import { currentMonthOf, taskState, stTxt, aggregates } from "../lib/compute.js";
 import ChangesTab from "./ChangesTab.jsx";
 import MembersTab from "./MembersTab.jsx";
+import ManagePlanTab from "./ManagePlanTab.jsx";
 
 const stClass = { done: "b-done", late: "b-late", now: "b-now", future: "b-future", cancelled: "b-cancelled" };
 
@@ -196,11 +197,13 @@ export default function PlanDashboard({ planId, me }) {
           <button className={`tab ${tab === "board" ? "on" : ""}`} onClick={() => setTab("board")}>لوحة المتابعة</button>
           <button className={`tab ${tab === "changes" ? "on" : ""}`} onClick={() => setTab("changes")}>طلبات التغيير</button>
           <button className={`tab ${tab === "members" ? "on" : ""}`} onClick={() => setTab("members")}>الأعضاء</button>
+          {isManager && <button className={`tab ${tab === "manage" ? "on" : ""}`} onClick={() => setTab("manage")}>إدارة الخطة</button>}
         </div>
       </div>
 
       {tab === "members" && <MembersTab planId={planId} members={members} isManager={isManager} onRefresh={load} />}
       {tab === "changes" && <ChangesTab planId={planId} me={me} isManager={isManager} names={names} onApplied={load} />}
+      {tab === "manage" && isManager && <ManagePlanTab plan={plan} onRefresh={load} />}
       {tab === "board" && (
         <>
           <div className="row">
