@@ -5,6 +5,7 @@ import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
+import Gauge from "../components/Gauge.jsx";
 
 const TEAL = "#0E5E4E", TEALMID = "#2E8B76", SAND = "#C9A15C",
       RED = "#B3402F", AMBER = "#B37E17", GRAY = "#B9C4C0", LIGHT = "#DCE5E2";
@@ -83,14 +84,16 @@ export default function Analytics({ me }) {
       { name: "ملغاة", value: states.cancelled, color: LIGHT },
     ].filter((s) => s.value > 0);
 
-    return { totals, line, bars, pie };
+    const planCards = perPlan.map(({ p, ag }) => ({ id: p.id, name: p.name, pct: ag.pct, done: ag.done, total: ag.total }));
+
+    return { totals, line, bars, pie, planCards };
   }, [plans, sel]);
 
   if (err) return <div className="alert-err">⚠ {err}</div>;
   if (plans === null) return <div className="mut">جارٍ التحميل…</div>;
   if (!plans.length) return <div className="card" style={{ textAlign: "center", color: "var(--mut)" }}>لا توجد خطط بعد — ارفع خطة أولاً ثم عد للوحة التحكم.</div>;
 
-  const { totals, line, bars, pie } = view;
+  const { totals, line, bars, pie, planCards } = view;
 
   return (
     <>
@@ -136,23 +139,47 @@ export default function Analytics({ me }) {
         </ResponsiveContainer>
       </div>
 
-      <div className="card">
-        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
-          {sel === "all" ? "نسبة إنجاز كل خطة" : "نسبة إنجاز كل مؤشر"}
+      {sel === "all" ? (
+        <div className="card">
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>نسبة إنجاز كل خطة</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+            {planCards.map((c) => (
+              <div key={c.id} className="card" style={{ textAlign: "center", cursor: "pointer" }} onClick={() => setSel(c.id)}>
+                <div style={{ background: "var(--teal)", color: "#fff", borderRadius: 10, padding: "8px 6px", fontWeight: 700, fontSize: 12.5, marginBottom: 10 }}>
+                  {c.name}
+                </div>
+                <Gauge value={c.pct} size={120} />
+                <div className="row" style={{ marginTop: 8, gap: 6 }}>
+                  <div style={{ flex: 1, background: "var(--sand-soft)", color: "var(--sand-ink)", borderRadius: 8, padding: "6px 4px" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{c.done}</div>
+                    <div style={{ fontSize: 10 }}>المنجز</div>
+                  </div>
+                  <div style={{ flex: 1, background: "#EEF1F0", color: "var(--mut)", borderRadius: 8, padding: "6px 4px" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{c.total}</div>
+                    <div style={{ fontSize: 10 }}>إجمالي المهام</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <ResponsiveContainer width="100%" height={Math.max(200, bars.length * 44)}>
-          <BarChart data={bars} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={LIGHT} horizontal={false} />
-            <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} fontSize={11} />
-            <YAxis type="category" dataKey="name" width={190} fontSize={11} />
-            <Tooltip formatter={(v) => `${v}%`} />
-            <Bar dataKey="نسبة الإنجاز" radius={[0, 6, 6, 0]}>
-              {bars.map((b, i) => <Cell key={i} fill={b.late ? RED : TEALMID} />)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-        <div className="mut" style={{ fontSize: 11 }}>العمود الأحمر = يحوي مهاماً متأخرة</div>
-      </div>
+      ) : (
+        <div className="card">
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>نسبة إنجاز كل مؤشر</div>
+          <ResponsiveContainer width="100%" height={Math.max(200, bars.length * 44)}>
+            <BarChart data={bars} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={LIGHT} horizontal={false} />
+              <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} fontSize={11} />
+              <YAxis type="category" dataKey="name" width={190} fontSize={11} />
+              <Tooltip formatter={(v) => `${v}%`} />
+              <Bar dataKey="نسبة الإنجاز" radius={[0, 6, 6, 0]}>
+                {bars.map((b, i) => <Cell key={i} fill={b.late ? RED : TEALMID} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="mut" style={{ fontSize: 11 }}>العمود الأحمر = يحوي مهاماً متأخرة</div>
+        </div>
+      )}
 
       <div className="card">
         <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>توزيع حالات المهام</div>
