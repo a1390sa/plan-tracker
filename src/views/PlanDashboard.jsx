@@ -10,6 +10,11 @@ function AssignPanel({ task, members, canManage, onChange }) {
   const primary = task.assignments.find((a) => a.role === "primary");
   const support = task.assignments.filter((a) => a.role === "support").map((a) => a.user_id);
 
+  const setKind = async (kind) => {
+    await supabase.from("tasks").update({ task_kind: kind }).eq("id", task.id);
+    onChange();
+  };
+
   const setPrimary = async (uid) => {
     if (primary) await supabase.from("task_assignments").delete().eq("id", primary.id);
     if (uid) {
@@ -27,6 +32,14 @@ function AssignPanel({ task, members, canManage, onChange }) {
 
   return (
     <div style={{ padding: "10px 14px 12px", background: "#FAFBFA", borderTop: "1px dashed var(--line)" }}>
+      <div className="row" style={{ marginBottom: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--mut)", minWidth: 88 }}>نوع المهمة:</span>
+        <select className="input" style={{ width: "auto" }} disabled={!canManage}
+          value={task.task_kind} onChange={(e) => setKind(e.target.value)}>
+          <option value="basic">أساسية</option>
+          <option value="sub">جزئية</option>
+        </select>
+      </div>
       <div className="row">
         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--teal)", minWidth: 88 }}>المسؤول الرئيس:</span>
         <select className="input" style={{ width: "auto", fontWeight: 700 }} disabled={!canManage}

@@ -60,6 +60,7 @@ create table if not exists tasks (
   month_no int not null check (month_no between 1 and 60),
   description text not null,
   status text not null default 'pending' check (status in ('pending','done','cancelled')),
+  task_kind text not null default 'basic' check (task_kind in ('basic','sub')),
   completed_at timestamptz,
   created_at timestamptz not null default now()
 );
