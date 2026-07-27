@@ -155,19 +155,19 @@ export default function Analytics({ me }) {
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>نسبة إنجاز كل خطة</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
               {planCards.map((c) => (
-                <div key={c.id} className="card" style={{ textAlign: "center", cursor: "pointer" }} onClick={() => setSel(c.id)}>
-                  <div style={{ background: "var(--teal)", color: "#fff", borderRadius: 10, padding: "8px 6px", fontWeight: 700, fontSize: 12.5, marginBottom: 10 }}>
-                    {c.name}
-                  </div>
-                  <Gauge value={c.pct} size={120} />
-                  <div className="row" style={{ marginTop: 8, gap: 6 }}>
-                    <div style={{ flex: 1, background: "var(--sand-soft)", color: "var(--sand-ink)", borderRadius: 8, padding: "6px 4px" }}>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{c.done}</div>
-                      <div style={{ fontSize: 10 }}>المنجز</div>
-                    </div>
-                    <div style={{ flex: 1, background: "#EEF1F0", color: "var(--mut)", borderRadius: 8, padding: "6px 4px" }}>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{c.total}</div>
-                      <div style={{ fontSize: 10 }}>إجمالي المهام</div>
+                <div key={c.id} className="card" style={{ textAlign: "center", cursor: "pointer", padding: 0, overflow: "hidden" }} onClick={() => setSel(c.id)}>
+                  <div className="card-head" style={{ borderRadius: "13px 13px 0 0", marginBottom: 10 }}>{c.name}</div>
+                  <div style={{ padding: "0 12px 12px" }}>
+                    <Gauge value={c.pct} size={120} />
+                    <div className="row" style={{ marginTop: 8, gap: 6 }}>
+                      <div style={{ flex: 1, background: "var(--sand-soft)", color: "var(--sand-ink)", borderRadius: 8, padding: "6px 4px" }}>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>{c.done}</div>
+                        <div style={{ fontSize: 10 }}>المنجز</div>
+                      </div>
+                      <div style={{ flex: 1, background: "#EEF1F0", color: "var(--mut)", borderRadius: 8, padding: "6px 4px" }}>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>{c.total}</div>
+                        <div style={{ fontSize: 10 }}>إجمالي المهام</div>
+                      </div>
                     </div>
                   </div>
                 </div>
