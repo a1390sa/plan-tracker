@@ -33,7 +33,7 @@ button { cursor: pointer; }
 .grow { flex: 1; min-width: 0; }
 .mut { color: var(--mut); font-size: 12px; }
 .kpi { flex: 1; min-width: 130px; }
-.kpi .v { font-size: 36px; font-weight: 700; line-height: 1; margin-top: 6px; }
+.kpi .v { font-size: 72px; font-weight: 700; line-height: 1; margin-top: 6px; }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .tab { padding: 8px 16px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--mut); font-weight: 700; }
 .tab.on { background: var(--teal); border-color: var(--teal); color: #fff; }
