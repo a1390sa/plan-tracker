@@ -11,8 +11,11 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [openPlan, setOpenPlan] = useState(null);
   const [view, setView] = useState("analytics"); // plans | analytics | settings
+  const [analyticsKey, setAnalyticsKey] = useState(0); // bump لإعادة لوحة التحكم لعرض كل الخطط
   const [recovery, setRecovery] = useState(false);
   const [reload, setReload] = useState(0);
+
+  const goHome = () => { setOpenPlan(null); setView("analytics"); setAnalyticsKey((k) => k + 1); };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
@@ -44,10 +47,10 @@ export default function App() {
           </div>
         </div>
         <div className="row">
-          {openPlan && <button className="btn btn-ghost" onClick={() => setOpenPlan(null)}>← رجوع</button>}
+          <button className="btn btn-ghost" onClick={goHome}>← رجوع</button>
           <div className="tabs">
             <button className={`tab ${!openPlan && view === "plans" ? "on" : ""}`} onClick={() => { setOpenPlan(null); setView("plans"); }}>خططي</button>
-            <button className={`tab ${!openPlan && view === "analytics" ? "on" : ""}`} onClick={() => { setOpenPlan(null); setView("analytics"); }}>لوحة التحكم</button>
+            <button className={`tab ${!openPlan && view === "analytics" ? "on" : ""}`} onClick={() => { setOpenPlan(null); setView("analytics"); setAnalyticsKey((k) => k + 1); }}>لوحة التحكم</button>
             <button className={`tab ${!openPlan && view === "settings" ? "on" : ""}`} onClick={() => { setOpenPlan(null); setView("settings"); }}>الإعدادات</button>
           </div>
           <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>تسجيل الخروج</button>
@@ -57,7 +60,7 @@ export default function App() {
       {openPlan
         ? <PlanDashboard planId={openPlan} me={profile} onBack={() => setOpenPlan(null)} />
         : view === "analytics"
-          ? <Analytics me={profile} />
+          ? <Analytics key={analyticsKey} me={profile} />
           : view === "settings"
             ? <Settings me={profile} onProfileChange={() => setReload((n) => n + 1)} />
             : <PlansList me={profile} onOpen={setOpenPlan} />}
