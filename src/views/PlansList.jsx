@@ -10,6 +10,7 @@ export default function PlansList({ me, onOpen }) {
   const [startYear, setStartYear] = useState(new Date().getFullYear());
   const [startMonth, setStartMonth] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [yearFilter, setYearFilter] = useState(2026);
   const fileRef = useRef(null);
 
   const load = async () => {
@@ -97,6 +98,8 @@ export default function PlansList({ me, onOpen }) {
     }
   };
 
+  const visiblePlans = plans && (yearFilter === "all" ? plans : plans.filter((p) => p.start_year === yearFilter));
+
   return (
     <>
       <div className="card">
@@ -105,7 +108,15 @@ export default function PlansList({ me, onOpen }) {
             <div style={{ fontWeight: 700, fontSize: 15 }}>خططي</div>
             <div className="mut">ارفع خطة جديدة وفق القالب المعتمد (12–60 شهراً)</div>
           </div>
-          <button className="btn btn-primary" onClick={() => fileRef.current.click()}>رفع خطة جديدة</button>
+          <div className="row">
+            <label className="mut">السنة:</label>
+            <select className="input" style={{ width: "auto" }} value={yearFilter}
+              onChange={(e) => setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value))}>
+              {Array.from(new Set([2026, ...(plans || []).map((p) => p.start_year)])).sort((a, b) => b - a).map((y) => <option key={y} value={y}>{y}</option>)}
+              <option value="all">كل السنوات</option>
+            </select>
+            <button className="btn btn-primary" onClick={() => fileRef.current.click()}>رفع خطة جديدة</button>
+          </div>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" hidden
             onChange={(e) => { if (e.target.files[0]) pick(e.target.files[0]); e.target.value = ""; }} />
         </div>
@@ -148,7 +159,11 @@ export default function PlansList({ me, onOpen }) {
         <div className="card" style={{ textAlign: "center", color: "var(--mut)" }}>
           لا توجد خطط بعد — ارفع أول خطة لتبدأ المتابعة.
         </div>
-      ) : plans.map((p) => {
+      ) : !visiblePlans.length ? (
+        <div className="card" style={{ textAlign: "center", color: "var(--mut)" }}>
+          لا توجد خطط لسنة {yearFilter}.
+        </div>
+      ) : visiblePlans.map((p) => {
         const tasks = (p.indicators || []).flatMap((i) => i.tasks || []);
         const cur = currentMonthOf(p);
         const ag = aggregates(tasks, cur);
