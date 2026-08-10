@@ -10,7 +10,7 @@ export default function App() {
   const [session, setSession] = useState(undefined); // undefined = جارٍ التحقق
   const [profile, setProfile] = useState(null);
   const [openPlan, setOpenPlan] = useState(null);
-  const [view, setView] = useState("plans"); // plans | analytics | settings
+  const [view, setView] = useState("analytics"); // plans | analytics | settings
   const [recovery, setRecovery] = useState(false);
   const [reload, setReload] = useState(0);
 
@@ -44,15 +44,12 @@ export default function App() {
           </div>
         </div>
         <div className="row">
-          {openPlan ? (
-            <button className="btn btn-ghost" onClick={() => setOpenPlan(null)}>← كل الخطط</button>
-          ) : (
-            <div className="tabs">
-              <button className={`tab ${view === "plans" ? "on" : ""}`} onClick={() => setView("plans")}>خططي</button>
-              <button className={`tab ${view === "analytics" ? "on" : ""}`} onClick={() => setView("analytics")}>لوحة التحكم</button>
-              <button className={`tab ${view === "settings" ? "on" : ""}`} onClick={() => setView("settings")}>الإعدادات</button>
-            </div>
-          )}
+          {openPlan && <button className="btn btn-ghost" onClick={() => setOpenPlan(null)}>← رجوع</button>}
+          <div className="tabs">
+            <button className={`tab ${!openPlan && view === "plans" ? "on" : ""}`} onClick={() => { setOpenPlan(null); setView("plans"); }}>خططي</button>
+            <button className={`tab ${!openPlan && view === "analytics" ? "on" : ""}`} onClick={() => { setOpenPlan(null); setView("analytics"); }}>لوحة التحكم</button>
+            <button className={`tab ${!openPlan && view === "settings" ? "on" : ""}`} onClick={() => { setOpenPlan(null); setView("settings"); }}>الإعدادات</button>
+          </div>
           <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>تسجيل الخروج</button>
         </div>
       </div>
