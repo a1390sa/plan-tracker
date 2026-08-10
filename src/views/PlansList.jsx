@@ -7,9 +7,11 @@ export default function PlansList({ me, onOpen }) {
   const [plans, setPlans] = useState(null);
   const [err, setErr] = useState("");
   const [preview, setPreview] = useState(null); // {parsed, file}
+  const [planName, setPlanName] = useState("");
   const [startYear, setStartYear] = useState(new Date().getFullYear());
   const [startMonth, setStartMonth] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [yearFilter, setYearFilter] = useState(2026);
   const fileRef = useRef(null);
 
   const load = async () => {
@@ -26,7 +28,11 @@ export default function PlansList({ me, onOpen }) {
     setErr("");
     const rd = new FileReader();
     rd.onload = (e) => {
-      try { setPreview({ parsed: parseWorkbook(e.target.result, file.name), file }); }
+      try {
+        const parsed = parseWorkbook(e.target.result, file.name);
+        setPreview({ parsed, file });
+        setPlanName(parsed.name);
+      }
       catch (ex) { setErr(ex.message); }
     };
     rd.readAsArrayBuffer(file);
@@ -47,7 +53,7 @@ export default function PlansList({ me, onOpen }) {
       if (up.error) throw new Error("[1 رفع الملف للمخزن] " + up.error.message);
       // 2) إنشاء الخطة
       const { data: plan, error: pe } = await supabase.from("plans").insert({
-        name: parsed.name, months_count: parsed.months,
+        name: planName.trim() || parsed.name, months_count: parsed.months,
         start_year: Number(startYear), start_month: Number(startMonth),
         owner_id: uid, source_path: path,
       }).select().single();
@@ -97,6 +103,8 @@ export default function PlansList({ me, onOpen }) {
     }
   };
 
+  const visiblePlans = plans && (yearFilter === "all" ? plans : plans.filter((p) => p.start_year === yearFilter));
+
   return (
     <>
       <div className="card">
@@ -105,7 +113,15 @@ export default function PlansList({ me, onOpen }) {
             <div style={{ fontWeight: 700, fontSize: 15 }}>خططي</div>
             <div className="mut">ارفع خطة جديدة وفق القالب المعتمد (12–60 شهراً)</div>
           </div>
-          <button className="btn btn-primary" onClick={() => fileRef.current.click()}>رفع خطة جديدة</button>
+          <div className="row">
+            <label className="mut">السنة:</label>
+            <select className="input" style={{ width: "auto" }} value={yearFilter}
+              onChange={(e) => setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value))}>
+              {Array.from(new Set([2026, ...(plans || []).map((p) => p.start_year)])).sort((a, b) => b - a).map((y) => <option key={y} value={y}>{y}</option>)}
+              <option value="all">كل السنوات</option>
+            </select>
+            <button className="btn btn-primary" onClick={() => fileRef.current.click()}>رفع خطة جديدة</button>
+          </div>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" hidden
             onChange={(e) => { if (e.target.files[0]) pick(e.target.files[0]); e.target.value = ""; }} />
         </div>
@@ -114,7 +130,7 @@ export default function PlansList({ me, onOpen }) {
 
       {preview && (
         <div className="card" style={{ borderColor: "var(--teal)" }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>معاينة قبل الاعتماد: {preview.parsed.name}</div>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>معاينة قبل الاعتماد</div>
           <div className="mut" style={{ marginBottom: 8 }}>
             {preview.parsed.indicators.length} مؤشرات · {preview.parsed.indicators.reduce((a, i) => a + i.tasks.length, 0)} مهمة · {preview.parsed.months} شهراً
           </div>
@@ -128,6 +144,10 @@ export default function PlansList({ me, onOpen }) {
             <div className="alert-warn" style={{ marginBottom: 10 }}><b>ملاحظات التحقق:</b> {preview.parsed.warnings.join(" · ")}</div>
           )}
           <div className="row" style={{ marginBottom: 12 }}>
+            <label className="mut">اسم الخطة:</label>
+            <input className="input grow" style={{ minWidth: 220 }} value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="اسم مختصر يدل على الخطة" />
+          </div>
+          <div className="row" style={{ marginBottom: 12 }}>
             <label className="mut">سنة بداية الخطة:</label>
             <input className="input" style={{ width: 110 }} dir="ltr" type="number" value={startYear} onChange={(e) => setStartYear(e.target.value)} />
             <label className="mut">شهر البداية:</label>
@@ -137,7 +157,7 @@ export default function PlansList({ me, onOpen }) {
           </div>
           <div className="row">
             <button className="btn btn-primary"
-              disabled={busy || preview.parsed.indicators.reduce((a, i) => a + i.tasks.length, 0) === 0}
+              disabled={busy || !planName.trim() || preview.parsed.indicators.reduce((a, i) => a + i.tasks.length, 0) === 0}
               onClick={commit}>{busy ? "جارٍ الاعتماد…" : "اعتماد ورفع"}</button>
             <button className="btn btn-ghost" onClick={() => setPreview(null)}>إلغاء</button>
           </div>
@@ -148,7 +168,11 @@ export default function PlansList({ me, onOpen }) {
         <div className="card" style={{ textAlign: "center", color: "var(--mut)" }}>
           لا توجد خطط بعد — ارفع أول خطة لتبدأ المتابعة.
         </div>
-      ) : plans.map((p) => {
+      ) : !visiblePlans.length ? (
+        <div className="card" style={{ textAlign: "center", color: "var(--mut)" }}>
+          لا توجد خطط لسنة {yearFilter}.
+        </div>
+      ) : visiblePlans.map((p) => {
         const tasks = (p.indicators || []).flatMap((i) => i.tasks || []);
         const cur = currentMonthOf(p);
         const ag = aggregates(tasks, cur);

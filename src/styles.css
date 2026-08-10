@@ -13,6 +13,7 @@ button { cursor: pointer; }
 .container { max-width: 1000px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 14px; }
 .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(34,48,44,.06); }
 .card-head { background: var(--sand); color: var(--navy); font-weight: 700; font-size: 13px; padding: 10px 16px; }
+.card-head-clamp { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dashboard-detail { display: grid; grid-template-columns: 1fr; gap: 14px; }
 @media (min-width: 760px) {
   .dashboard-detail { grid-template-columns: 260px 220px 1fr; align-items: start; }
@@ -32,7 +33,7 @@ button { cursor: pointer; }
 .grow { flex: 1; min-width: 0; }
 .mut { color: var(--mut); font-size: 12px; }
 .kpi { flex: 1; min-width: 130px; }
-.kpi .v { font-size: 26px; font-weight: 700; line-height: 1; margin-top: 6px; }
+.kpi .v { font-size: 36px; font-weight: 700; line-height: 1; margin-top: 6px; }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .tab { padding: 8px 16px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--mut); font-weight: 700; }
 .tab.on { background: var(--teal); border-color: var(--teal); color: #fff; }

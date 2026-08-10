@@ -14,6 +14,7 @@ export default function Analytics({ me }) {
   const [plans, setPlans] = useState(null);
   const [sel, setSel] = useState("all");
   const [kindFilter, setKindFilter] = useState("all");
+  const [yearFilter, setYearFilter] = useState(2026);
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -23,9 +24,20 @@ export default function Analytics({ me }) {
       .then(({ data, error }) => { if (error) setErr(error.message); setPlans(data || []); });
   }, []);
 
+  const years = useMemo(() => {
+    const set = new Set([2026]);
+    (plans || []).forEach((p) => set.add(p.start_year));
+    return Array.from(set).sort((a, b) => b - a);
+  }, [plans]);
+
+  const yearPlans = useMemo(() => {
+    if (!plans) return plans;
+    return yearFilter === "all" ? plans : plans.filter((p) => p.start_year === yearFilter);
+  }, [plans, yearFilter]);
+
   const view = useMemo(() => {
-    if (!plans) return null;
-    const chosen = sel === "all" ? plans : plans.filter((p) => p.id === sel);
+    if (!yearPlans) return null;
+    const chosen = sel === "all" ? yearPlans : yearPlans.filter((p) => p.id === sel);
     if (!chosen.length) return null;
 
     // مهام كل خطة مع شهرها الجاري الخاص
@@ -91,11 +103,20 @@ export default function Analytics({ me }) {
     }
 
     return { totals, line, pie, planCards, detail };
-  }, [plans, sel]);
+  }, [yearPlans, sel]);
 
   if (err) return <div className="alert-err">⚠ {err}</div>;
   if (plans === null) return <div className="mut">جارٍ التحميل…</div>;
   if (!plans.length) return <div className="card" style={{ textAlign: "center", color: "var(--mut)" }}>لا توجد خطط بعد — ارفع خطة أولاً ثم عد للوحة التحكم.</div>;
+  if (!yearPlans.length) return (
+    <div className="card row" style={{ justifyContent: "space-between" }}>
+      <div className="mut">لا توجد خطط لسنة {yearFilter} — جرّب سنة أخرى.</div>
+      <select className="input" style={{ width: "auto" }} value={yearFilter} onChange={(e) => { setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value)); setSel("all"); }}>
+        {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        <option value="all">كل السنوات</option>
+      </select>
+    </div>
+  );
 
   const { totals, line, pie, planCards, detail } = view;
   const applyKindFilter = (list) => list.filter((t) => {
@@ -110,10 +131,16 @@ export default function Analytics({ me }) {
       <div className="card row" style={{ justifyContent: "space-between" }}>
         <div style={{ fontWeight: 700, fontSize: 15 }}>لوحة التحكم</div>
         <div className="row">
+          <label className="mut">السنة:</label>
+          <select className="input" style={{ width: "auto", fontWeight: 700 }} value={yearFilter}
+            onChange={(e) => { setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value)); setSel("all"); }}>
+            {years.map((y) => <option key={y} value={y}>{y}</option>)}
+            <option value="all">كل السنوات</option>
+          </select>
           <label className="mut">النطاق:</label>
           <select className="input" style={{ width: "auto", fontWeight: 700 }} value={sel} onChange={(e) => setSel(e.target.value)}>
-            <option value="all">جميع الخطط ({plans.length})</option>
-            {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            <option value="all">جميع الخطط ({yearPlans.length})</option>
+            {yearPlans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
       </div>
@@ -156,16 +183,16 @@ export default function Analytics({ me }) {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
               {planCards.map((c) => (
                 <div key={c.id} className="card" style={{ textAlign: "center", cursor: "pointer", padding: 0, overflow: "hidden" }} onClick={() => setSel(c.id)}>
-                  <div className="card-head" style={{ borderRadius: "13px 13px 0 0", marginBottom: 10 }}>{c.name}</div>
+                  <div className="card-head card-head-clamp" style={{ borderRadius: "13px 13px 0 0", marginBottom: 10 }} title={c.name}>{c.name}</div>
                   <div style={{ padding: "0 12px 12px" }}>
                     <Gauge value={c.pct} size={120} />
                     <div className="row" style={{ marginTop: 8, gap: 6 }}>
                       <div style={{ flex: 1, background: "var(--sand-soft)", color: "var(--sand-ink)", borderRadius: 8, padding: "6px 4px" }}>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>{c.done}</div>
+                        <div style={{ fontWeight: 700, fontSize: 18 }}>{c.done}</div>
                         <div style={{ fontSize: 10 }}>المنجز</div>
                       </div>
                       <div style={{ flex: 1, background: "#EEF1F0", color: "var(--mut)", borderRadius: 8, padding: "6px 4px" }}>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>{c.total}</div>
+                        <div style={{ fontWeight: 700, fontSize: 18 }}>{c.total}</div>
                         <div style={{ fontSize: 10 }}>إجمالي المهام</div>
                       </div>
                     </div>
@@ -177,13 +204,14 @@ export default function Analytics({ me }) {
 
           <div className="card">
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>توزيع حالات المهام</div>
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie data={pie} dataKey="value" nameKey="name" innerRadius={60} outerRadius={95}
-                  paddingAngle={2} label={(e) => `${e.name} (${e.value})`} fontSize={12}>
+                  paddingAngle={2} label={(e) => e.value} fontSize={13} fontWeight={700}>
                   {pie.map((s, i) => <Cell key={i} fill={s.color} />)}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(v, n) => [v, n]} />
+                <Legend verticalAlign="bottom" formatter={(v) => v} />
               </PieChart>
             </ResponsiveContainer>
           </div>

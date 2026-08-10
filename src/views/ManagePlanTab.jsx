@@ -92,8 +92,15 @@ function IndicatorCard({ indicator, monthsCount, onRefresh }) {
 }
 
 export default function ManagePlanTab({ plan, onRefresh }) {
+  const [planName, setPlanName] = useState(plan.name);
   const [newIndName, setNewIndName] = useState("");
   const [newIndTarget, setNewIndTarget] = useState(0);
+
+  const savePlanName = async () => {
+    if (!planName.trim()) return;
+    await supabase.from("plans").update({ name: planName.trim() }).eq("id", plan.id);
+    onRefresh();
+  };
 
   const addIndicator = async () => {
     if (!newIndName.trim()) return;
@@ -107,6 +114,17 @@ export default function ManagePlanTab({ plan, onRefresh }) {
 
   return (
     <>
+      <div className="card">
+        <div style={{ fontWeight: 700, marginBottom: 10 }}>معلومات الخطة</div>
+        <div className="row">
+          <label className="mut">اسم الخطة:</label>
+          <input className="input grow" value={planName} onChange={(e) => setPlanName(e.target.value)} />
+          {planName.trim() !== plan.name && (
+            <button className="btn btn-primary" disabled={!planName.trim()} onClick={savePlanName}>حفظ</button>
+          )}
+        </div>
+      </div>
+
       <div className="card">
         <div style={{ fontWeight: 700, marginBottom: 10 }}>إضافة مؤشر جديد</div>
         <div className="row">
