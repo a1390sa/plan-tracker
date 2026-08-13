@@ -60,8 +60,8 @@ export default function Analytics({ me }) {
     };
     totals.pct = totals.total ? Math.round((totals.done / totals.total) * 100) : 0;
 
-    // منحنى التراكمي: مستهدف مقابل محقق لكل شهر
-    const maxM = Math.max(...chosen.map((p) => p.months_count));
+    // منحنى التراكمي: مستهدف مقابل محقق لكل شهر — 12 شهراً عند اختيار سنة محدّدة، أو أطول خطة عند "كل السنوات"
+    const maxM = yearFilter === "all" ? Math.max(...chosen.map((p) => p.months_count)) : 12;
     const line = [];
     for (let m = 1; m <= maxM; m++) {
       const planned = allTasks.filter((t) => t.status !== "cancelled" && t.month_no <= m).length;
@@ -106,7 +106,7 @@ export default function Analytics({ me }) {
     }
 
     return { totals, line, pie, planCards, detail };
-  }, [yearPlans, sel]);
+  }, [yearPlans, sel, yearFilter]);
 
   if (err) return <div className="alert-err">⚠ {err}</div>;
   if (plans === null) return <div className="mut">جارٍ التحميل…</div>;
