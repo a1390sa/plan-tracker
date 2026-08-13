@@ -13,9 +13,12 @@ const TEAL = "#0E5E4E", TEALMID = "#2E8B76", SAND = "#C9A15C",
 export default function Analytics({ me }) {
   const [plans, setPlans] = useState(null);
   const [sel, setSel] = useState("all");
+  const [detailOpen, setDetailOpen] = useState(false);
   const [kindFilter, setKindFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState(2026);
   const [err, setErr] = useState("");
+
+  const selectPlan = (id) => { setSel(id); setDetailOpen(false); };
 
   useEffect(() => {
     supabase.from("plans")
@@ -111,7 +114,7 @@ export default function Analytics({ me }) {
   if (!yearPlans.length) return (
     <div className="card row" style={{ justifyContent: "space-between" }}>
       <div className="mut">لا توجد خطط لسنة {yearFilter} — جرّب سنة أخرى.</div>
-      <select className="input" style={{ width: "auto" }} value={yearFilter} onChange={(e) => { setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value)); setSel("all"); }}>
+      <select className="input" style={{ width: "auto" }} value={yearFilter} onChange={(e) => { setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value)); setSel("all"); setDetailOpen(false); }}>
         {years.map((y) => <option key={y} value={y}>{y}</option>)}
         <option value="all">كل السنوات</option>
       </select>
@@ -133,12 +136,12 @@ export default function Analytics({ me }) {
         <div className="row">
           <label className="mut">السنة:</label>
           <select className="input" style={{ width: "auto", fontWeight: 700 }} value={yearFilter}
-            onChange={(e) => { setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value)); setSel("all"); }}>
+            onChange={(e) => { setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value)); setSel("all"); setDetailOpen(false); }}>
             {years.map((y) => <option key={y} value={y}>{y}</option>)}
             <option value="all">كل السنوات</option>
           </select>
           <label className="mut">النطاق:</label>
-          <select className="input" style={{ width: "auto", fontWeight: 700 }} value={sel} onChange={(e) => setSel(e.target.value)}>
+          <select className="input" style={{ width: "auto", fontWeight: 700 }} value={sel} onChange={(e) => selectPlan(e.target.value)}>
             <option value="all">جميع الخطط ({yearPlans.length})</option>
             {yearPlans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
@@ -182,7 +185,7 @@ export default function Analytics({ me }) {
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>نسبة إنجاز كل خطة</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
               {planCards.map((c) => (
-                <div key={c.id} className="card" style={{ textAlign: "center", cursor: "pointer", padding: 0, overflow: "hidden" }} onClick={() => setSel(c.id)}>
+                <div key={c.id} className="card" style={{ textAlign: "center", cursor: "pointer", padding: 0, overflow: "hidden" }} onClick={() => selectPlan(c.id)}>
                   <div className="card-head card-head-clamp" style={{ borderRadius: "13px 13px 0 0", marginBottom: 10 }} title={c.name}>{c.name}</div>
                   <div style={{ padding: "0 12px 12px" }}>
                     <Gauge value={c.pct} size={120} />
@@ -216,8 +219,63 @@ export default function Analytics({ me }) {
             </ResponsiveContainer>
           </div>
         </>
+      ) : !detailOpen ? (
+        <>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>{yearPlans.find((p) => p.id === sel)?.name}</div>
+            <button className="btn btn-primary" onClick={() => setDetailOpen(true)}>عرض تفصيل المؤشرات والمهام ←</button>
+          </div>
+
+          <div className="row">
+            {[
+              ["نسبة الإنجاز", `${totals.pct}%`, "للخطة المختارة", TEAL],
+              ["المهام", totals.total, `المحقق منها ${totals.done}`, TEALMID],
+              ["متأخرة", totals.late, "تجاوزت شهرها دون إنجاز", totals.late ? RED : TEAL],
+              ["مستحقة هذا الشهر", totals.now, "في شهرها الجاري الآن", AMBER],
+            ].map(([l, v, s, c]) => (
+              <div key={l} className="card kpi">
+                <div className="mut">{l}</div>
+                <div className="v" style={{ color: c }}>{v}</div>
+                <div className="mut" style={{ fontSize: 11, marginTop: 6 }}>{s}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="card">
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>المسار التراكمي: المستهدف مقابل المحقق</div>
+            <div className="mut" style={{ marginBottom: 10 }}>كل نقطة = مجموع المهام حتى ذلك الشهر — انفراج الخطين يعني تراكماً</div>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={line} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={LIGHT} />
+                <XAxis dataKey="month" tickFormatter={(m) => `ش${m}`} fontSize={11} />
+                <YAxis fontSize={11} allowDecimals={false} />
+                <Tooltip labelFormatter={(m) => `الشهر ${m}`} />
+                <Legend />
+                <Line type="monotone" dataKey="المستهدف التراكمي" stroke={SAND} strokeWidth={2.5} strokeDasharray="6 4" dot={false} />
+                <Line type="monotone" dataKey="المحقق التراكمي" stroke={TEAL} strokeWidth={2.5} dot={{ r: 2.5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="card">
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>توزيع حالات المهام</div>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie data={pie} dataKey="value" nameKey="name" innerRadius={60} outerRadius={95}
+                  paddingAngle={2} label={(e) => e.value} fontSize={13} fontWeight={700}>
+                  {pie.map((s, i) => <Cell key={i} fill={s.color} />)}
+                </Pie>
+                <Tooltip formatter={(v, n) => [v, n]} />
+                <Legend verticalAlign="bottom" formatter={(v) => v} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </>
       ) : (
         <div className="dashboard-detail">
+          <div className="row" style={{ gridColumn: "1 / -1" }}>
+            <button className="btn btn-ghost" onClick={() => setDetailOpen(false)}>→ رجوع لملخص الخطة</button>
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {kindFilter !== "sub" && (
               <div className="card" style={{ padding: 0, overflow: "hidden" }}>
