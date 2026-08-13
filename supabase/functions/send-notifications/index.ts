@@ -16,6 +16,12 @@ const APP_URL = Deno.env.get("APP_URL") ?? "";
 
 type Line = { kind: string; text: string; taskId: string | null };
 
+// PT-04: تشفير أي نص قادم من بيانات المستخدم قبل إدراجه في HTML البريد
+function escapeHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 function currentMonthOf(plan: any, d: Date) {
   const idx = (d.getUTCFullYear() - plan.start_year) * 12 + (d.getUTCMonth() + 1) - plan.start_month + 1;
   return Math.min(Math.max(idx, 1), plan.months_count);
@@ -120,10 +126,10 @@ Deno.serve(async () => {
   for (const [uid, box] of inbox) {
     if (!box.lines.length || !box.email) continue;
     const html = `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;font-size:14px;line-height:1.9;color:#22302C">
-      <p>السلام عليكم ${box.name}،</p>
+      <p>السلام عليكم ${escapeHtml(box.name)}،</p>
       <p>تنبيهات نظام متابعة الخطط لهذا اليوم:</p>
-      <ul>${box.lines.map((l) => `<li>${l.text}</li>`).join("")}</ul>
-      ${APP_URL ? `<p><a href="${APP_URL}">فتح النظام</a></p>` : ""}
+      <ul>${box.lines.map((l) => `<li>${escapeHtml(l.text)}</li>`).join("")}</ul>
+      ${APP_URL ? `<p><a href="${escapeHtml(APP_URL)}">فتح النظام</a></p>` : ""}
       <p style="color:#6B7A75;font-size:12px">رسالة آلية — لا تردّ عليها.</p></div>`;
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
