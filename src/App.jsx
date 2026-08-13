@@ -21,6 +21,8 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       if (event === "PASSWORD_RECOVERY") setRecovery(true);
+      // كل تسجيل دخول جديد يبدأ من لوحة التحكم، بغض النظر عن آخر صفحة كانت مفتوحة
+      if (event === "SIGNED_IN") { setOpenPlan(null); setView("analytics"); setAnalyticsKey((k) => k + 1); }
       setSession(s);
     });
     return () => sub.subscription.unsubscribe();
