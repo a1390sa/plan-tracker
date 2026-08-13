@@ -133,10 +133,36 @@ create or replace function task_plan(t uuid) returns uuid
 language sql security definer set search_path = public stable as $$
   select i.plan_id from tasks k join indicators i on i.id = k.indicator_id where k.id = t;
 $$;
+create or replace function is_admin_user() returns boolean
+language sql security definer set search_path = public stable as $$
+  select coalesce((select is_admin from profiles where id = auth.uid()), false);
+$$;
 
--- profiles: كل مسجَّل يقرأ الأسماء (لقوائم الإسناد)، ويعدّل ملفه فقط
-create policy profiles_read on profiles for select to authenticated using (true);
+-- profiles: كل مسجَّل يقرأ ملفه أو ملفات من يشاركونه خطة، ويعدّل ملفه فقط
+create policy profiles_read on profiles for select to authenticated using (
+  id = auth.uid()
+  or exists (
+    select 1 from plan_members pm1 join plan_members pm2 on pm1.plan_id = pm2.plan_id
+    where pm1.user_id = auth.uid() and pm2.user_id = profiles.id
+  )
+  or is_admin_user()
+);
 create policy profiles_update on profiles for update to authenticated using (id = auth.uid());
+
+-- PT-01: منع أي مستخدم من ترقية نفسه لمدير نظام (id=auth.uid() لا يقيّد الأعمدة القابلة للتعديل)
+create or replace function prevent_privilege_escalation() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.is_admin is distinct from old.is_admin then
+    if not is_admin_user() then
+      raise exception 'غير مصرح: لا يمكنك تغيير صلاحية المدير';
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists guard_is_admin on profiles;
+create trigger guard_is_admin before update on profiles
+  for each row execute function prevent_privilege_escalation();
 
 -- plans
 create policy plans_read on plans for select to authenticated using (is_plan_member(id));
@@ -164,6 +190,24 @@ create policy tasks_manager_all on tasks for all to authenticated
 create policy tasks_primary_update on tasks for update to authenticated
   using (exists(select 1 from task_assignments a where a.task_id = id and a.user_id = auth.uid() and a.role = 'primary'));
 
+-- PT-06: المسؤول الرئيس (غير المدير) يحدّث حالة المهمة فقط، لا تفاصيلها
+create or replace function guard_task_primary_update() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if is_plan_manager((select plan_id from indicators where id = old.indicator_id)) then
+    return new;
+  end if;
+  if new.indicator_id is distinct from old.indicator_id
+     or new.month_no is distinct from old.month_no
+     or new.description is distinct from old.description then
+    raise exception 'المسؤول الرئيس يحدّث حالة المهمة فقط، لا تفاصيلها — استخدم طلب تغيير';
+  end if;
+  return new;
+end $$;
+drop trigger if exists guard_task_update on tasks;
+create trigger guard_task_update before update on tasks
+  for each row execute function guard_task_primary_update();
+
 -- task_assignments: القراءة للأعضاء، الكتابة لمدير الخطة
 create policy assign_read on task_assignments for select to authenticated
   using (is_plan_member(task_plan(task_id)));
@@ -187,5 +231,7 @@ create policy notif_read on notifications for select to authenticated using (rec
 -- ============================================================
 insert into storage.buckets (id, name, public) values ('plans','plans',false)
 on conflict (id) do nothing;
+-- PT-02: كل مستخدم يصل فقط لمجلده الخاص (المسار: <uid>/...) لا لملفات الجهات الأخرى
 create policy plans_storage_rw on storage.objects for all to authenticated
-  using (bucket_id = 'plans') with check (bucket_id = 'plans');
+  using (bucket_id = 'plans' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'plans' and (storage.foldername(name))[1] = auth.uid()::text);
