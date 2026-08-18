@@ -168,7 +168,7 @@ create trigger guard_is_admin before update on profiles
 create policy plans_read on plans for select to authenticated using (is_plan_member(id));
 create policy plans_insert on plans for insert to authenticated with check (owner_id = auth.uid());
 create policy plans_update on plans for update to authenticated using (is_plan_manager(id));
-create policy plans_delete on plans for delete to authenticated using (owner_id = auth.uid());
+create policy plans_delete on plans for delete to authenticated using (owner_id = auth.uid() or is_admin_user());
 
 -- plan_members
 create policy members_read on plan_members for select to authenticated using (is_plan_member(plan_id));

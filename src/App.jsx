@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "./lib/supabase.js";
 import Auth, { ResetPassword } from "./views/Auth.jsx";
 import PlansList from "./views/PlansList.jsx";
@@ -16,13 +16,21 @@ export default function App() {
   const [reload, setReload] = useState(0);
 
   const goHome = () => { setOpenPlan(null); setView("analytics"); setAnalyticsKey((k) => k + 1); };
+  const hadSession = useRef(false); // لتمييز تسجيل دخول حقيقي عن إعادة تحقق الجلسة عند رجوع التبويب للواجهة
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    supabase.auth.getSession().then(({ data }) => {
+      hadSession.current = !!data.session;
+      setSession(data.session ?? null);
+    });
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       if (event === "PASSWORD_RECOVERY") setRecovery(true);
-      // كل تسجيل دخول جديد يبدأ من لوحة التحكم، بغض النظر عن آخر صفحة كانت مفتوحة
-      if (event === "SIGNED_IN") { setOpenPlan(null); setView("analytics"); setAnalyticsKey((k) => k + 1); }
+      // Supabase يعيد إطلاق SIGNED_IN أحياناً عند رجوع التبويب للواجهة فقط (بلا تسجيل دخول حقيقي)،
+      // فنعتمد على عدم وجود جلسة سابقة لتمييز الدخول الحقيقي فقط، ونبدأ حينها من لوحة التحكم
+      if (event === "SIGNED_IN" && !hadSession.current) {
+        setOpenPlan(null); setView("analytics"); setAnalyticsKey((k) => k + 1);
+      }
+      hadSession.current = !!s;
       setSession(s);
     });
     return () => sub.subscription.unsubscribe();
