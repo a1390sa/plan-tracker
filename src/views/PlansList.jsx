@@ -93,12 +93,14 @@ export default function PlansList({ me, onOpen }) {
     setErr("");
     try {
       if (p.source_path) await supabase.storage.from("plans").remove([p.source_path]);
-      const { error } = await supabase.from("plans").delete().eq("id", p.id);
+      const { data, error } = await supabase.from("plans").delete().eq("id", p.id).select();
       if (error) throw error;
+      // حذف محجوب بصلاحيات الوصول (RLS) لا يُرجع خطأً، بل صفر صفوف محذوفة — يجب التحقق يدوياً
+      if (!data || !data.length) throw new Error("لا تملك صلاحية حذف هذه الخطة — الحذف مقصور على صاحب الخطة أو مدير النظام.");
       await load();
     } catch (e) {
       setErr(e.message.includes("row-level security")
-        ? "لا تملك صلاحية حذف هذه الخطة — الحذف لصاحب الخطة فقط."
+        ? "لا تملك صلاحية حذف هذه الخطة — الحذف مقصور على صاحب الخطة أو مدير النظام."
         : e.message);
     }
   };

@@ -22,7 +22,7 @@ export default function Analytics({ me }) {
 
   useEffect(() => {
     supabase.from("plans")
-      .select("*, indicators(id, name, sort_order, tasks(id, month_no, status, description, task_kind))")
+      .select("*, indicators(id, name, sort_order, tasks(id, month_no, status, description, task_kind, parent_task_id))")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => { if (error) setErr(error.message); setPlans(data || []); });
   }, []);
@@ -95,11 +95,14 @@ export default function Analytics({ me }) {
       const curTasks = active.filter((t) => t.month_no === cur);
       const basicList = active.filter((t) => t.task_kind !== "sub").sort((a, b) => a.month_no - b.month_no);
       const subList = active.filter((t) => t.task_kind === "sub").sort((a, b) => a.month_no - b.month_no);
+      const parentName = Object.fromEntries(active.map((t) => [t.id, t.description]));
+      const childCount = {};
+      for (const t of subList) if (t.parent_task_id) childCount[t.parent_task_id] = (childCount[t.parent_task_id] || 0) + 1;
       detail = {
         cur, ag,
         monthly,
         curTasks,
-        basicList, subList,
+        basicList, subList, parentName, childCount,
         curDone: curTasks.filter((t) => t.status === "done").length,
         curPending: curTasks.filter((t) => t.status !== "done").length,
       };
@@ -284,6 +287,7 @@ export default function Analytics({ me }) {
                   {applyKindFilter(detail.basicList).map((t) => (
                     <li key={t.id} style={{ padding: "4px 0", color: t.status === "done" ? "var(--mut)" : "var(--ink)", textDecoration: t.status === "done" ? "line-through" : "none" }}>
                       {t.description} <span className="mut">(شهر {t.month_no})</span>
+                      {detail.childCount[t.id] > 0 && <span className="badge" style={{ color: "var(--teal)", background: "var(--teal-soft)", marginRight: 6 }}>{detail.childCount[t.id]} جزئية</span>}
                     </li>
                   ))}
                   {!applyKindFilter(detail.basicList).length && <li className="mut" style={{ listStyle: "none" }}>لا توجد مهام</li>}
@@ -297,6 +301,9 @@ export default function Analytics({ me }) {
                   {applyKindFilter(detail.subList).map((t) => (
                     <li key={t.id} style={{ padding: "4px 0", color: t.status === "done" ? "var(--mut)" : "var(--ink)", textDecoration: t.status === "done" ? "line-through" : "none" }}>
                       {t.description} <span className="mut">(شهر {t.month_no})</span>
+                      <div className="mut" style={{ fontSize: 11 }}>
+                        ↳ ضمن: {t.parent_task_id ? (detail.parentName[t.parent_task_id] || "مهمة أساسية محذوفة") : "بلا مهمة أساسية أب"}
+                      </div>
                     </li>
                   ))}
                   {!applyKindFilter(detail.subList).length && <li className="mut" style={{ listStyle: "none" }}>لا توجد مهام</li>}
@@ -343,7 +350,7 @@ export default function Analytics({ me }) {
                   <tbody>
                     {applyKindFilter(detail.curTasks).map((t) => (
                       <tr key={t.id}>
-                        <td>{t.task_kind !== "sub" ? t.description : "—"}</td>
+                        <td>{t.task_kind !== "sub" ? t.description : (t.parent_task_id ? detail.parentName[t.parent_task_id] : "—") || "—"}</td>
                         <td>{t.task_kind === "sub" ? t.description : "—"}</td>
                         <td>شهر {t.month_no}</td>
                         <td>{stTxt[taskState(t, detail.cur)]}</td>
