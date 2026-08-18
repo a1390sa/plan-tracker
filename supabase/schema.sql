@@ -61,6 +61,7 @@ create table if not exists tasks (
   description text not null,
   status text not null default 'pending' check (status in ('pending','done','cancelled')),
   task_kind text not null default 'basic' check (task_kind in ('basic','sub')),
+  parent_task_id uuid references tasks(id) on delete set null,
   completed_at timestamptz,
   created_at timestamptz not null default now()
 );

@@ -7,12 +7,19 @@ import ManagePlanTab from "./ManagePlanTab.jsx";
 
 const stClass = { done: "b-done", late: "b-late", now: "b-now", future: "b-future", cancelled: "b-cancelled" };
 
-function AssignPanel({ task, members, canManage, onChange }) {
+function AssignPanel({ task, members, siblings, canManage, onChange }) {
   const primary = task.assignments.find((a) => a.role === "primary");
   const support = task.assignments.filter((a) => a.role === "support").map((a) => a.user_id);
+  const basicOptions = siblings.filter((s) => s.task_kind !== "sub" && s.id !== task.id);
 
   const setKind = async (kind) => {
-    await supabase.from("tasks").update({ task_kind: kind }).eq("id", task.id);
+    const patch = { task_kind: kind };
+    if (kind === "basic") patch.parent_task_id = null; // المهمة الأساسية لا تتبع أحداً
+    await supabase.from("tasks").update(patch).eq("id", task.id);
+    onChange();
+  };
+  const setParent = async (parentId) => {
+    await supabase.from("tasks").update({ parent_task_id: parentId || null }).eq("id", task.id);
     onChange();
   };
 
@@ -40,6 +47,16 @@ function AssignPanel({ task, members, canManage, onChange }) {
           <option value="basic">أساسية</option>
           <option value="sub">جزئية</option>
         </select>
+        {task.task_kind === "sub" && (
+          <>
+            <select className="input" style={{ width: "auto" }} disabled={!canManage}
+              value={task.parent_task_id || ""} onChange={(e) => setParent(e.target.value)}>
+              <option value="">اختر المهمة الأساسية (الأب)</option>
+              {basicOptions.map((b) => <option key={b.id} value={b.id}>{b.description}</option>)}
+            </select>
+            {!task.parent_task_id && <span className="badge" style={{ color: "var(--sand-ink)", background: "var(--sand-soft)" }}>بلا مهمة أساسية أب</span>}
+          </>
+        )}
       </div>
       <div className="row">
         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--teal)", minWidth: 88 }}>المسؤول الرئيس:</span>
@@ -68,7 +85,7 @@ function AssignPanel({ task, members, canManage, onChange }) {
   );
 }
 
-function TaskRow({ task, cur, me, isManager, members, names, onRefresh, onRequestChange }) {
+function TaskRow({ task, cur, me, isManager, members, siblings, names, onRefresh, onRequestChange }) {
   const [open, setOpen] = useState(false);
   const st = taskState(task, cur);
   const primary = task.assignments.find((a) => a.role === "primary");
@@ -111,7 +128,7 @@ function TaskRow({ task, cur, me, isManager, members, names, onRefresh, onReques
           </button>
         )}
       </div>
-      {open && <AssignPanel task={task} members={members} canManage={isManager} onChange={onRefresh} />}
+      {open && <AssignPanel task={task} members={members} siblings={siblings} canManage={isManager} onChange={onRefresh} />}
     </div>
   );
 }
@@ -137,7 +154,7 @@ function IndicatorCard({ ind, cur, filter, ...rest }) {
           <span style={{ fontSize: 12, color: ag.gap < 0 ? "var(--red)" : "var(--teal)" }}>الفارق التراكمي: {ag.gap > 0 ? "+" : ""}{ag.gap}</span>
         </div>
       </div>
-      {open && tasks.sort((a, b) => a.month_no - b.month_no).map((t) => <TaskRow key={t.id} task={t} cur={cur} {...rest} />)}
+      {open && tasks.sort((a, b) => a.month_no - b.month_no).map((t) => <TaskRow key={t.id} task={t} cur={cur} siblings={ind.tasks} {...rest} />)}
     </div>
   );
 }
