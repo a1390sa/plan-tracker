@@ -51,7 +51,11 @@ export default function Analytics({ me }) {
       return { p, tasks, cur, ag: aggregates(tasks, cur) };
     });
 
-    const allTasks = perPlan.flatMap((x) => x.tasks.map((t) => ({ ...t, _cur: x.cur })));
+    const allTasks = perPlan.flatMap((x) => x.tasks.map((t) => ({ ...t, _cur: x.cur, _planName: x.p.name })));
+    const allViewMonth = sel === "all" && monthSel !== "cur" ? Number(monthSel) : null;
+    const monthTasksAll = allViewMonth
+      ? allTasks.filter((t) => t.status !== "cancelled" && t.month_no === allViewMonth).sort((a, b) => a._planName.localeCompare(b._planName, "ar"))
+      : [];
     const totals = {
       plans: chosen.length,
       total: allTasks.filter((t) => t.status !== "cancelled").length,
@@ -110,7 +114,7 @@ export default function Analytics({ me }) {
       };
     }
 
-    return { totals, line, pie, planCards, detail };
+    return { totals, line, pie, planCards, detail, allViewMonth, monthTasksAll, monthsRangeAll: maxM };
   }, [yearPlans, sel, yearFilter, monthSel]);
 
   if (err) return <div className="alert-err">⚠ {err}</div>;
@@ -126,7 +130,7 @@ export default function Analytics({ me }) {
     </div>
   );
 
-  const { totals, line, pie, planCards, detail } = view;
+  const { totals, line, pie, planCards, detail, allViewMonth, monthTasksAll, monthsRangeAll } = view;
   const applyKindFilter = (list) => list.filter((t) => {
     if (kindFilter === "done") return t.status === "done";
     if (kindFilter === "basic") return t.task_kind !== "sub";
@@ -150,12 +154,12 @@ export default function Analytics({ me }) {
             <option value="all">جميع الخطط ({yearPlans.length})</option>
             {yearPlans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-          {sel !== "all" && detailOpen && detail && (
+          {((sel !== "all" && detailOpen && detail) || (sel === "all" && monthsRangeAll)) && (
             <>
               <label className="mut">الشهر:</label>
               <select className="input" style={{ width: "auto", fontWeight: 700 }} value={monthSel} onChange={(e) => setMonthSel(e.target.value)}>
-                <option value="cur">الشهر الجاري (شهر {detail.cur})</option>
-                {Array.from({ length: detail.months }, (_, i) => i + 1).map((m) => <option key={m} value={m}>شهر {m}</option>)}
+                <option value="cur">{sel === "all" ? "بلا تصفية شهر" : `الشهر الجاري (شهر ${detail.cur})`}</option>
+                {Array.from({ length: sel === "all" ? monthsRangeAll : detail.months }, (_, i) => i + 1).map((m) => <option key={m} value={m}>شهر {m}</option>)}
               </select>
             </>
           )}
@@ -232,6 +236,31 @@ export default function Analytics({ me }) {
               </PieChart>
             </ResponsiveContainer>
           </div>
+
+          {allViewMonth && (
+            <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+              <div className="card-head">مهام شهر {allViewMonth} عبر كل الخطط ({monthTasksAll.length})</div>
+              <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                <table className="tbl">
+                  <thead>
+                    <tr><th>الخطة</th><th>المهمة</th><th>حالة الإنجاز</th></tr>
+                  </thead>
+                  <tbody>
+                    {monthTasksAll.map((t) => (
+                      <tr key={t.id}>
+                        <td>{t._planName}</td>
+                        <td>{t.description}</td>
+                        <td>{stTxt[taskState(t, t._cur)]}</td>
+                      </tr>
+                    ))}
+                    {!monthTasksAll.length && (
+                      <tr><td colSpan={3} className="mut" style={{ textAlign: "center" }}>لا توجد مهام في هذا الشهر</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       ) : !detailOpen ? (
         <>
