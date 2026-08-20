@@ -51,17 +51,19 @@ export default function Analytics({ me }) {
       return { p, tasks, cur, ag: aggregates(tasks, cur) };
     });
 
-    const allTasks = perPlan.flatMap((x) => x.tasks.map((t) => ({ ...t, _cur: x.cur, _planName: x.p.name })));
+    const allTasks = perPlan.flatMap((x) => x.tasks.map((t) => ({ ...t, _cur: x.cur, _planName: x.p.name, _planId: x.p.id })));
     const allViewMonth = sel === "all" && monthSel !== "cur" ? Number(monthSel) : null;
     const monthTasksAll = allViewMonth
       ? allTasks.filter((t) => t.status !== "cancelled" && t.month_no === allViewMonth).sort((a, b) => a._planName.localeCompare(b._planName, "ar"))
       : [];
+    // عند اختيار شهر محدَّد في "جميع الخطط"، تُحسب البطاقات لمهام ذلك الشهر تحديداً بدل الإجمالي العام
+    const kpiScope = allViewMonth ? monthTasksAll : allTasks.filter((t) => t.status !== "cancelled");
     const totals = {
       plans: chosen.length,
-      total: allTasks.filter((t) => t.status !== "cancelled").length,
-      done: allTasks.filter((t) => t.status === "done").length,
-      late: allTasks.filter((t) => taskState(t, t._cur) === "late").length,
-      now: allTasks.filter((t) => taskState(t, t._cur) === "now").length,
+      total: kpiScope.length,
+      done: kpiScope.filter((t) => t.status === "done").length,
+      late: kpiScope.filter((t) => taskState(t, t._cur) === "late").length,
+      now: allViewMonth ? kpiScope.filter((t) => t.status !== "done").length : allTasks.filter((t) => taskState(t, t._cur) === "now").length,
     };
     totals.pct = totals.total ? Math.round((totals.done / totals.total) * 100) : 0;
 
@@ -74,9 +76,9 @@ export default function Analytics({ me }) {
       line.push({ month: m, "المستهدف التراكمي": planned, "المحقق التراكمي": actual });
     }
 
-    // دائرة توزيع الحالات
+    // دائرة توزيع الحالات — لمهام الشهر المختار فقط عند التصفية، أو كل المهام
     const states = { done: 0, late: 0, now: 0, future: 0, cancelled: 0 };
-    for (const t of allTasks) states[taskState(t, t._cur)]++;
+    for (const t of (allViewMonth ? monthTasksAll : allTasks)) states[taskState(t, t._cur)]++;
     const pie = [
       { name: "منجزة", value: states.done, color: TEAL },
       { name: "متأخرة", value: states.late, color: RED },
@@ -85,7 +87,12 @@ export default function Analytics({ me }) {
       { name: "ملغاة", value: states.cancelled, color: LIGHT },
     ].filter((s) => s.value > 0);
 
-    const planCards = perPlan.map(({ p, ag }) => ({ id: p.id, name: p.name, pct: ag.pct, done: ag.done, total: ag.total }));
+    const planCards = perPlan.map(({ p, ag }) => {
+      if (!allViewMonth) return { id: p.id, name: p.name, pct: ag.pct, done: ag.done, total: ag.total };
+      const mTasks = monthTasksAll.filter((t) => t._planId === p.id);
+      const mDone = mTasks.filter((t) => t.status === "done").length;
+      return { id: p.id, name: p.name, done: mDone, total: mTasks.length, pct: mTasks.length ? Math.round((mDone / mTasks.length) * 100) : 0 };
+    });
 
     let detail = null;
     if (sel !== "all") {
@@ -169,12 +176,17 @@ export default function Analytics({ me }) {
       {sel === "all" ? (
         <>
           <div className="row">
-            {[
+            {(allViewMonth ? [
+              ["نسبة الإنجاز", `${totals.pct}%`, `مهام شهر ${allViewMonth} عبر ${totals.plans} خطط`, TEAL],
+              ["مهام الشهر", totals.total, `المحقق منها ${totals.done}`, TEALMID],
+              ["متأخرة", totals.late, "تجاوزت شهرها دون إنجاز حتى اليوم", totals.late ? RED : TEAL],
+              ["قيد الانتظار", totals.now, "لم تُنجز بعد من مهام هذا الشهر", AMBER],
+            ] : [
               ["نسبة الإنجاز", `${totals.pct}%`, `عبر ${totals.plans} خطط`, TEAL],
               ["المهام", totals.total, `المحقق منها ${totals.done}`, TEALMID],
               ["متأخرة", totals.late, "تجاوزت شهرها دون إنجاز", totals.late ? RED : TEAL],
               ["مستحقة هذا الشهر", totals.now, "في شهرها الجاري الآن", AMBER],
-            ].map(([l, v, s, c]) => (
+            ]).map(([l, v, s, c]) => (
               <div key={l} className="card kpi">
                 <div className="mut">{l}</div>
                 <div className="v" style={{ color: c }}>{v}</div>
@@ -200,7 +212,7 @@ export default function Analytics({ me }) {
           </div>
 
           <div className="card">
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>نسبة إنجاز كل خطة</div>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>نسبة إنجاز كل خطة{allViewMonth ? ` — شهر ${allViewMonth}` : ""}</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
               {planCards.map((c) => (
                 <div key={c.id} className="card" style={{ textAlign: "center", cursor: "pointer", padding: 0, overflow: "hidden" }} onClick={() => selectPlan(c.id)}>
