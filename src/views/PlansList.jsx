@@ -51,22 +51,25 @@ export default function PlansList({ me, onOpen }) {
       const path = `${uid}/${Date.now()}_${safeName}`;
       const up = await supabase.storage.from("plans").upload(path, file);
       if (up.error) throw new Error("[1 رفع الملف للمخزن] " + up.error.message);
-      // 2) إنشاء الخطة
-      const { data: plan, error: pe } = await supabase.from("plans").insert({
+      // 2) إنشاء الخطة — نولّد المعرّف من المتصفح لتفادي الحاجة لأي RETURNING عند الإدراج
+      const planId = crypto.randomUUID();
+      const { error: pe } = await supabase.from("plans").insert({
+        id: planId,
         name: planName.trim() || parsed.name, months_count: parsed.months,
         start_year: Number(startYear), start_month: Number(startMonth),
         owner_id: uid, source_path: path,
-      }).select().single();
+      });
       if (pe) throw new Error("[2 إنشاء الخطة] " + pe.message);
       // 3) عضوية المالك كمدير
-      const { error: me2 } = await supabase.from("plan_members").insert({ plan_id: plan.id, user_id: uid, role: "manager" });
+      const { error: me2 } = await supabase.from("plan_members").insert({ plan_id: planId, user_id: uid, role: "manager" });
       if (me2) throw new Error("[3 عضوية المالك] " + me2.message);
-      // 4) المؤشرات ثم المهام
-      const { data: inds, error: ie } = await supabase.from("indicators").insert(
-        parsed.indicators.map((i) => ({ plan_id: plan.id, name: i.name, total_target: i.target, sort_order: i.sort }))
-      ).select();
+      // 4) المؤشرات ثم المهام (نفس مبدأ توليد المعرّف محلياً)
+      const indicatorRows = parsed.indicators.map((i) => ({
+        id: crypto.randomUUID(), plan_id: planId, name: i.name, total_target: i.target, sort_order: i.sort,
+      }));
+      const { error: ie } = await supabase.from("indicators").insert(indicatorRows);
       if (ie) throw new Error("[4 إنشاء المؤشرات] " + ie.message);
-      const byName = Object.fromEntries(inds.map((i) => [i.name + "|" + i.sort_order, i.id]));
+      const byName = Object.fromEntries(indicatorRows.map((i) => [i.name + "|" + i.sort_order, i.id]));
       const taskRows = [];
       parsed.indicators.forEach((i) => {
         const iid = byName[i.name + "|" + i.sort];
@@ -76,7 +79,7 @@ export default function PlansList({ me, onOpen }) {
       if (te) throw new Error("[5 إنشاء المهام] " + te.message);
       setPreview(null);
       await load();
-      onOpen(plan.id);
+      onOpen(planId);
     } catch (e) {
       setErr(e.message?.includes("row-level security")
         ? e.message + " ← صلاحية مرفوضة في هذه الخطوة. تأكد من وجود ملفك الشخصي في جدول profiles."
@@ -93,10 +96,11 @@ export default function PlansList({ me, onOpen }) {
     setErr("");
     try {
       if (p.source_path) await supabase.storage.from("plans").remove([p.source_path]);
-      const { data, error } = await supabase.from("plans").delete().eq("id", p.id).select();
+      // حذف محجوب بصلاحيات الوصول (RLS) لا يُرجع خطأً، بل صفر صفوف محذوفة — نتحقق بالعدد count
+      // (نتجنّب .select() هنا لأنه يصطدم بعلة RETURNING المكتشفة في هذه الجلسة)
+      const { error, count } = await supabase.from("plans").delete({ count: "exact" }).eq("id", p.id);
       if (error) throw error;
-      // حذف محجوب بصلاحيات الوصول (RLS) لا يُرجع خطأً، بل صفر صفوف محذوفة — يجب التحقق يدوياً
-      if (!data || !data.length) throw new Error("لا تملك صلاحية حذف هذه الخطة — الحذف مقصور على صاحب الخطة أو مدير النظام.");
+      if (!count) throw new Error("لا تملك صلاحية حذف هذه الخطة — الحذف مقصور على صاحب الخطة أو مدير النظام.");
       await load();
     } catch (e) {
       setErr(e.message.includes("row-level security")

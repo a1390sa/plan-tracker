@@ -16,9 +16,10 @@ export default function Analytics({ me }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [kindFilter, setKindFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState(2026);
+  const [monthSel, setMonthSel] = useState("cur");
   const [err, setErr] = useState("");
 
-  const selectPlan = (id) => { setSel(id); setDetailOpen(false); };
+  const selectPlan = (id) => { setSel(id); setDetailOpen(false); setMonthSel("cur"); };
 
   useEffect(() => {
     supabase.from("plans")
@@ -92,14 +93,15 @@ export default function Analytics({ me }) {
         const done = due.filter((t) => t.status === "done").length;
         monthly.push({ month: m, "مهام مستحقة": due.length, "نسبة الإنجاز": due.length ? Math.round((done / due.length) * 100) : 0 });
       }
-      const curTasks = active.filter((t) => t.month_no === cur);
+      const viewMonth = monthSel === "cur" ? cur : Number(monthSel);
+      const curTasks = active.filter((t) => t.month_no === viewMonth);
       const basicList = active.filter((t) => t.task_kind !== "sub").sort((a, b) => a.month_no - b.month_no);
       const subList = active.filter((t) => t.task_kind === "sub").sort((a, b) => a.month_no - b.month_no);
       const parentName = Object.fromEntries(active.map((t) => [t.id, t.description]));
       const childCount = {};
       for (const t of subList) if (t.parent_task_id) childCount[t.parent_task_id] = (childCount[t.parent_task_id] || 0) + 1;
       detail = {
-        cur, ag,
+        cur, ag, months: p.months_count, viewMonth,
         monthly,
         curTasks,
         basicList, subList, parentName, childCount,
@@ -109,7 +111,7 @@ export default function Analytics({ me }) {
     }
 
     return { totals, line, pie, planCards, detail };
-  }, [yearPlans, sel, yearFilter]);
+  }, [yearPlans, sel, yearFilter, monthSel]);
 
   if (err) return <div className="alert-err">⚠ {err}</div>;
   if (plans === null) return <div className="mut">جارٍ التحميل…</div>;
@@ -117,7 +119,7 @@ export default function Analytics({ me }) {
   if (!yearPlans.length) return (
     <div className="card row" style={{ justifyContent: "space-between" }}>
       <div className="mut">لا توجد خطط لسنة {yearFilter} — جرّب سنة أخرى.</div>
-      <select className="input" style={{ width: "auto" }} value={yearFilter} onChange={(e) => { setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value)); setSel("all"); setDetailOpen(false); }}>
+      <select className="input" style={{ width: "auto" }} value={yearFilter} onChange={(e) => { setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value)); setSel("all"); setDetailOpen(false); setMonthSel("cur"); }}>
         {years.map((y) => <option key={y} value={y}>{y}</option>)}
         <option value="all">كل السنوات</option>
       </select>
@@ -139,7 +141,7 @@ export default function Analytics({ me }) {
         <div className="row">
           <label className="mut">السنة:</label>
           <select className="input" style={{ width: "auto", fontWeight: 700 }} value={yearFilter}
-            onChange={(e) => { setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value)); setSel("all"); setDetailOpen(false); }}>
+            onChange={(e) => { setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value)); setSel("all"); setDetailOpen(false); setMonthSel("cur"); }}>
             {years.map((y) => <option key={y} value={y}>{y}</option>)}
             <option value="all">كل السنوات</option>
           </select>
@@ -148,6 +150,15 @@ export default function Analytics({ me }) {
             <option value="all">جميع الخطط ({yearPlans.length})</option>
             {yearPlans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          {sel !== "all" && detailOpen && detail && (
+            <>
+              <label className="mut">الشهر:</label>
+              <select className="input" style={{ width: "auto", fontWeight: 700 }} value={monthSel} onChange={(e) => setMonthSel(e.target.value)}>
+                <option value="cur">الشهر الجاري (شهر {detail.cur})</option>
+                {Array.from({ length: detail.months }, (_, i) => i + 1).map((m) => <option key={m} value={m}>شهر {m}</option>)}
+              </select>
+            </>
+          )}
         </div>
       </div>
 
@@ -341,7 +352,10 @@ export default function Analytics({ me }) {
             </div>
 
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-              <div className="card-head">مهام الشهر الحالي (شهر {detail.cur})</div>
+              <div className="card-head">
+                مهام شهر {detail.viewMonth}
+                {detail.viewMonth === detail.cur ? " (الشهر الجاري)" : ""}
+              </div>
               <div style={{ maxHeight: 280, overflowY: "auto" }}>
                 <table className="tbl">
                   <thead>
