@@ -111,8 +111,11 @@ export default function Analytics({ me }) {
       const parentName = Object.fromEntries(active.map((t) => [t.id, t.description]));
       const childCount = {};
       for (const t of subList) if (t.parent_task_id) childCount[t.parent_task_id] = (childCount[t.parent_task_id] || 0) + 1;
+      // نسبة الإنجاز/العدّاد الظاهران بالبطاقة الدائرية يعكسان مهام الشهر المختار تحديداً، وليس إجمالي الخطة
+      const viewDone = curTasks.filter((t) => t.status === "done").length;
+      const viewAg = { pct: curTasks.length ? Math.round((viewDone / curTasks.length) * 100) : 0, done: viewDone, total: curTasks.length };
       detail = {
-        cur, ag, months: p.months_count, viewMonth,
+        cur, ag: viewAg, months: p.months_count, viewMonth,
         monthly,
         curTasks,
         basicList, subList, parentName, childCount,
