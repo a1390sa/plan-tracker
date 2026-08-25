@@ -10,11 +10,13 @@ const stClass = { done: "b-done", late: "b-late", now: "b-now", future: "b-futur
 function AssignPanel({ task, members, siblings, canManage, onChange }) {
   const primary = task.assignments.find((a) => a.role === "primary");
   const support = task.assignments.filter((a) => a.role === "support").map((a) => a.user_id);
-  const basicOptions = siblings.filter((s) => s.task_kind !== "sub" && s.id !== task.id);
+  // المهمة الجزئية تتبع مهمة أساسية من نفس الشهر فقط — عبر الأشهر لا معنى له وتتكرر الأوصاف
+  const basicOptions = siblings.filter((s) => s.task_kind !== "sub" && s.id !== task.id && s.month_no === task.month_no);
 
   const setKind = async (kind) => {
     const patch = { task_kind: kind };
     if (kind === "basic") patch.parent_task_id = null; // المهمة الأساسية لا تتبع أحداً
+    else if (kind === "sub" && basicOptions.length === 1) patch.parent_task_id = basicOptions[0].id; // مرشّح وحيد — نعيّنه تلقائياً
     await supabase.from("tasks").update(patch).eq("id", task.id);
     onChange();
   };
