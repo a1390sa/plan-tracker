@@ -7,21 +7,12 @@ import ManagePlanTab from "./ManagePlanTab.jsx";
 
 const stClass = { done: "b-done", late: "b-late", now: "b-now", future: "b-future", cancelled: "b-cancelled" };
 
-function AssignPanel({ task, members, siblings, canManage, onChange }) {
+function AssignPanel({ task, members, indicatorName, canManage, onChange }) {
   const primary = task.assignments.find((a) => a.role === "primary");
   const support = task.assignments.filter((a) => a.role === "support").map((a) => a.user_id);
-  // المهمة الجزئية تتبع مهمة أساسية من نفس الشهر فقط — عبر الأشهر لا معنى له وتتكرر الأوصاف
-  const basicOptions = siblings.filter((s) => s.task_kind !== "sub" && s.id !== task.id && s.month_no === task.month_no);
 
   const setKind = async (kind) => {
-    const patch = { task_kind: kind };
-    if (kind === "basic") patch.parent_task_id = null; // المهمة الأساسية لا تتبع أحداً
-    else if (kind === "sub" && basicOptions.length === 1) patch.parent_task_id = basicOptions[0].id; // مرشّح وحيد — نعيّنه تلقائياً
-    await supabase.from("tasks").update(patch).eq("id", task.id);
-    onChange();
-  };
-  const setParent = async (parentId) => {
-    await supabase.from("tasks").update({ parent_task_id: parentId || null }).eq("id", task.id);
+    await supabase.from("tasks").update({ task_kind: kind }).eq("id", task.id);
     onChange();
   };
 
@@ -50,14 +41,7 @@ function AssignPanel({ task, members, siblings, canManage, onChange }) {
           <option value="sub">جزئية</option>
         </select>
         {task.task_kind === "sub" && (
-          <>
-            <select className="input" style={{ width: "auto" }} disabled={!canManage}
-              value={task.parent_task_id || ""} onChange={(e) => setParent(e.target.value)}>
-              <option value="">اختر المهمة الأساسية (الأب)</option>
-              {basicOptions.map((b) => <option key={b.id} value={b.id}>{b.description}</option>)}
-            </select>
-            {!task.parent_task_id && <span className="badge" style={{ color: "var(--sand-ink)", background: "var(--sand-soft)" }}>بلا مهمة أساسية أب</span>}
-          </>
+          <span className="badge" style={{ color: "var(--teal)", background: "var(--teal-soft)" }}>↳ ضمن: {indicatorName}</span>
         )}
       </div>
       <div className="row">
@@ -87,7 +71,7 @@ function AssignPanel({ task, members, siblings, canManage, onChange }) {
   );
 }
 
-function TaskRow({ task, cur, me, isManager, members, siblings, names, onRefresh, onRequestChange }) {
+function TaskRow({ task, cur, me, isManager, members, indicatorName, names, onRefresh, onRequestChange }) {
   const [open, setOpen] = useState(false);
   const st = taskState(task, cur);
   const primary = task.assignments.find((a) => a.role === "primary");
@@ -130,7 +114,7 @@ function TaskRow({ task, cur, me, isManager, members, siblings, names, onRefresh
           </button>
         )}
       </div>
-      {open && <AssignPanel task={task} members={members} siblings={siblings} canManage={isManager} onChange={onRefresh} />}
+      {open && <AssignPanel task={task} members={members} indicatorName={indicatorName} canManage={isManager} onChange={onRefresh} />}
     </div>
   );
 }
@@ -156,7 +140,7 @@ function IndicatorCard({ ind, cur, filter, ...rest }) {
           <span style={{ fontSize: 12, color: ag.gap < 0 ? "var(--red)" : "var(--teal)" }}>الفارق التراكمي: {ag.gap > 0 ? "+" : ""}{ag.gap}</span>
         </div>
       </div>
-      {open && tasks.sort((a, b) => a.month_no - b.month_no).map((t) => <TaskRow key={t.id} task={t} cur={cur} siblings={ind.tasks} {...rest} />)}
+      {open && tasks.sort((a, b) => a.month_no - b.month_no).map((t) => <TaskRow key={t.id} task={t} cur={cur} indicatorName={ind.name} {...rest} />)}
     </div>
   );
 }

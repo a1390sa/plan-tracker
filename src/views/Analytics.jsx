@@ -46,7 +46,7 @@ export default function Analytics({ me }) {
 
     // مهام كل خطة مع شهرها الجاري الخاص
     const perPlan = chosen.map((p) => {
-      const tasks = (p.indicators || []).flatMap((i) => i.tasks || []);
+      const tasks = (p.indicators || []).flatMap((i) => (i.tasks || []).map((t) => ({ ...t, _indName: i.name })));
       const cur = currentMonthOf(p);
       return { p, tasks, cur, ag: aggregates(tasks, cur) };
     });
@@ -108,9 +108,6 @@ export default function Analytics({ me }) {
       const curTasks = active.filter((t) => t.month_no === viewMonth);
       const basicList = active.filter((t) => t.task_kind !== "sub").sort((a, b) => a.month_no - b.month_no);
       const subList = active.filter((t) => t.task_kind === "sub").sort((a, b) => a.month_no - b.month_no);
-      const parentName = Object.fromEntries(active.map((t) => [t.id, t.description]));
-      const childCount = {};
-      for (const t of subList) if (t.parent_task_id) childCount[t.parent_task_id] = (childCount[t.parent_task_id] || 0) + 1;
       // نسبة الإنجاز/العدّاد الظاهران بالبطاقة الدائرية يعكسان مهام الشهر المختار تحديداً، وليس إجمالي الخطة
       const viewDone = curTasks.filter((t) => t.status === "done").length;
       const viewAg = { pct: curTasks.length ? Math.round((viewDone / curTasks.length) * 100) : 0, done: viewDone, total: curTasks.length };
@@ -118,7 +115,7 @@ export default function Analytics({ me }) {
         cur, ag: viewAg, months: p.months_count, viewMonth,
         monthly,
         curTasks,
-        basicList, subList, parentName, childCount,
+        basicList, subList,
         curDone: curTasks.filter((t) => t.status === "done").length,
         curPending: curTasks.filter((t) => t.status !== "done").length,
       };
@@ -342,7 +339,6 @@ export default function Analytics({ me }) {
                   {applyKindFilter(detail.basicList).map((t) => (
                     <li key={t.id} style={{ padding: "4px 0", color: t.status === "done" ? "var(--mut)" : "var(--ink)", textDecoration: t.status === "done" ? "line-through" : "none" }}>
                       {t.description} <span className="mut">(شهر {t.month_no})</span>
-                      {detail.childCount[t.id] > 0 && <span className="badge" style={{ color: "var(--teal)", background: "var(--teal-soft)", marginRight: 6 }}>{detail.childCount[t.id]} جزئية</span>}
                     </li>
                   ))}
                   {!applyKindFilter(detail.basicList).length && <li className="mut" style={{ listStyle: "none" }}>لا توجد مهام</li>}
@@ -357,7 +353,7 @@ export default function Analytics({ me }) {
                     <li key={t.id} style={{ padding: "4px 0", color: t.status === "done" ? "var(--mut)" : "var(--ink)", textDecoration: t.status === "done" ? "line-through" : "none" }}>
                       {t.description} <span className="mut">(شهر {t.month_no})</span>
                       <div className="mut" style={{ fontSize: 11 }}>
-                        ↳ ضمن: {t.parent_task_id ? (detail.parentName[t.parent_task_id] || "مهمة أساسية محذوفة") : "بلا مهمة أساسية أب"}
+                        ↳ ضمن: {t._indName}
                       </div>
                     </li>
                   ))}
@@ -408,7 +404,7 @@ export default function Analytics({ me }) {
                   <tbody>
                     {applyKindFilter(detail.curTasks).map((t) => (
                       <tr key={t.id}>
-                        <td>{t.task_kind !== "sub" ? t.description : (t.parent_task_id ? detail.parentName[t.parent_task_id] : "—") || "—"}</td>
+                        <td>{t.task_kind !== "sub" ? t.description : t._indName}</td>
                         <td>{t.task_kind === "sub" ? t.description : "—"}</td>
                         <td>شهر {t.month_no}</td>
                         <td>{stTxt[taskState(t, detail.cur)]}</td>
