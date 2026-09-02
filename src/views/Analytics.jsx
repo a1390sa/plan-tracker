@@ -52,9 +52,12 @@ export default function Analytics({ me }) {
     });
 
     const allTasks = perPlan.flatMap((x) => x.tasks.map((t) => ({ ...t, _cur: x.cur, _planName: x.p.name, _planId: x.p.id })));
-    const allViewMonth = sel === "all" && monthSel !== "cur" ? Number(monthSel) : null;
+    // "cN" = تراكمي حتى شهر N، "N" = شهر N فقط
+    const allCumulative = sel === "all" && monthSel !== "cur" && monthSel.startsWith("c");
+    const allViewMonth = sel === "all" && monthSel !== "cur" ? Number(allCumulative ? monthSel.slice(1) : monthSel) : null;
     const monthTasksAll = allViewMonth
-      ? allTasks.filter((t) => t.status !== "cancelled" && t.month_no === allViewMonth).sort((a, b) => a._planName.localeCompare(b._planName, "ar"))
+      ? allTasks.filter((t) => t.status !== "cancelled" && (allCumulative ? t.month_no <= allViewMonth : t.month_no === allViewMonth))
+          .sort((a, b) => a._planName.localeCompare(b._planName, "ar"))
       : [];
     // عند اختيار شهر محدَّد في "جميع الخطط"، تُحسب البطاقات لمهام ذلك الشهر تحديداً بدل الإجمالي العام
     const kpiScope = allViewMonth ? monthTasksAll : allTasks.filter((t) => t.status !== "cancelled");
@@ -104,15 +107,16 @@ export default function Analytics({ me }) {
         const done = due.filter((t) => t.status === "done").length;
         monthly.push({ month: m, "مهام مستحقة": due.length, "نسبة الإنجاز": due.length ? Math.round((done / due.length) * 100) : 0 });
       }
-      const viewMonth = monthSel === "cur" ? cur : Number(monthSel);
-      const curTasks = active.filter((t) => t.month_no === viewMonth);
+      const viewCumulative = monthSel !== "cur" && monthSel.startsWith("c");
+      const viewMonth = monthSel === "cur" ? cur : Number(viewCumulative ? monthSel.slice(1) : monthSel);
+      const curTasks = active.filter((t) => viewCumulative ? t.month_no <= viewMonth : t.month_no === viewMonth);
       const basicList = active.filter((t) => t.task_kind !== "sub").sort((a, b) => a.month_no - b.month_no);
       const subList = active.filter((t) => t.task_kind === "sub").sort((a, b) => a.month_no - b.month_no);
-      // نسبة الإنجاز/العدّاد الظاهران بالبطاقة الدائرية يعكسان مهام الشهر المختار تحديداً، وليس إجمالي الخطة
+      // نسبة الإنجاز/العدّاد الظاهران بالبطاقة الدائرية يعكسان مهام الشهر المختار (أو التراكم حتى شهره)، لا إجمالي الخطة
       const viewDone = curTasks.filter((t) => t.status === "done").length;
       const viewAg = { pct: curTasks.length ? Math.round((viewDone / curTasks.length) * 100) : 0, done: viewDone, total: curTasks.length };
       detail = {
-        cur, ag: viewAg, months: p.months_count, viewMonth,
+        cur, ag: viewAg, months: p.months_count, viewMonth, viewCumulative,
         monthly,
         curTasks,
         basicList, subList,
@@ -121,7 +125,7 @@ export default function Analytics({ me }) {
       };
     }
 
-    return { totals, line, pie, planCards, detail, allViewMonth, monthTasksAll, monthsRangeAll: maxM };
+    return { totals, line, pie, planCards, detail, allViewMonth, allCumulative, monthTasksAll, monthsRangeAll: maxM };
   }, [yearPlans, sel, yearFilter, monthSel]);
 
   if (err) return <div className="alert-err">⚠ {err}</div>;
@@ -137,7 +141,7 @@ export default function Analytics({ me }) {
     </div>
   );
 
-  const { totals, line, pie, planCards, detail, allViewMonth, monthTasksAll, monthsRangeAll } = view;
+  const { totals, line, pie, planCards, detail, allViewMonth, allCumulative, monthTasksAll, monthsRangeAll } = view;
   const applyKindFilter = (list) => list.filter((t) => {
     if (kindFilter === "done") return t.status === "done";
     if (kindFilter === "basic") return t.task_kind !== "sub";
@@ -166,7 +170,12 @@ export default function Analytics({ me }) {
               <label className="mut">الشهر:</label>
               <select className="input" style={{ width: "auto", fontWeight: 700 }} value={monthSel} onChange={(e) => setMonthSel(e.target.value)}>
                 <option value="cur">{sel === "all" ? "بلا تصفية شهر" : `الشهر الجاري (شهر ${detail.cur})`}</option>
-                {Array.from({ length: sel === "all" ? monthsRangeAll : detail.months }, (_, i) => i + 1).map((m) => <option key={m} value={m}>شهر {m}</option>)}
+                <optgroup label="شهر واحد فقط">
+                  {Array.from({ length: sel === "all" ? monthsRangeAll : detail.months }, (_, i) => i + 1).map((m) => <option key={"m" + m} value={m}>شهر {m}</option>)}
+                </optgroup>
+                <optgroup label="تراكمي حتى شهر">
+                  {Array.from({ length: sel === "all" ? monthsRangeAll : detail.months }, (_, i) => i + 1).map((m) => <option key={"c" + m} value={"c" + m}>حتى شهر {m}</option>)}
+                </optgroup>
               </select>
             </>
           )}
@@ -177,10 +186,10 @@ export default function Analytics({ me }) {
         <>
           <div className="row">
             {(allViewMonth ? [
-              ["نسبة الإنجاز", `${totals.pct}%`, `مهام شهر ${allViewMonth} عبر ${totals.plans} خطط`, TEAL],
-              ["مهام الشهر", totals.total, `المحقق منها ${totals.done}`, TEALMID],
+              ["نسبة الإنجاز", `${totals.pct}%`, `${allCumulative ? "تراكمي حتى" : "مهام"} شهر ${allViewMonth} عبر ${totals.plans} خطط`, TEAL],
+              [allCumulative ? "المهام حتى الشهر" : "مهام الشهر", totals.total, `المحقق منها ${totals.done}`, TEALMID],
               ["متأخرة", totals.late, "تجاوزت شهرها دون إنجاز حتى اليوم", totals.late ? RED : TEAL],
-              ["قيد الانتظار", totals.now, "لم تُنجز بعد من مهام هذا الشهر", AMBER],
+              ["قيد الانتظار", totals.now, allCumulative ? "لم تُنجز بعد من المهام حتى هذا الشهر" : "لم تُنجز بعد من مهام هذا الشهر", AMBER],
             ] : [
               ["نسبة الإنجاز", `${totals.pct}%`, `عبر ${totals.plans} خطط`, TEAL],
               ["المهام", totals.total, `المحقق منها ${totals.done}`, TEALMID],
@@ -212,7 +221,7 @@ export default function Analytics({ me }) {
           </div>
 
           <div className="card">
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>نسبة إنجاز كل خطة{allViewMonth ? ` — شهر ${allViewMonth}` : ""}</div>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>نسبة إنجاز كل خطة{allViewMonth ? ` — ${allCumulative ? "تراكمي حتى" : ""} شهر ${allViewMonth}` : ""}</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
               {planCards.map((c) => (
                 <div key={c.id} className="card" style={{ textAlign: "center", cursor: "pointer", padding: 0, overflow: "hidden" }} onClick={() => selectPlan(c.id)}>
@@ -251,7 +260,7 @@ export default function Analytics({ me }) {
 
           {allViewMonth && (
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-              <div className="card-head">مهام شهر {allViewMonth} عبر كل الخطط ({monthTasksAll.length})</div>
+              <div className="card-head">{allCumulative ? `مهام حتى شهر ${allViewMonth}` : `مهام شهر ${allViewMonth}`} عبر كل الخطط ({monthTasksAll.length})</div>
               <div style={{ maxHeight: 320, overflowY: "auto" }}>
                 <table className="tbl">
                   <thead>
@@ -393,8 +402,8 @@ export default function Analytics({ me }) {
 
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
               <div className="card-head">
-                مهام شهر {detail.viewMonth}
-                {detail.viewMonth === detail.cur ? " (الشهر الجاري)" : ""}
+                {detail.viewCumulative ? `مهام حتى شهر ${detail.viewMonth}` : `مهام شهر ${detail.viewMonth}`}
+                {!detail.viewCumulative && detail.viewMonth === detail.cur ? " (الشهر الجاري)" : ""}
               </div>
               <div style={{ maxHeight: 280, overflowY: "auto" }}>
                 <table className="tbl">
