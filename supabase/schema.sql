@@ -182,14 +182,14 @@ create policy ind_write on indicators for all to authenticated
   using (is_plan_manager(plan_id)) with check (is_plan_manager(plan_id));
 
 -- tasks: القراءة للأعضاء، الإدارة للمدير،
--- وتحديث الحالة للمسؤول الرئيس (يُضبط تفصيلاً في سياسة التحديث)
+-- وتحديث الحالة للمسؤول الرئيس أو المساند (يُضبط تفصيلاً في سياسة التحديث)
 create policy tasks_read on tasks for select to authenticated
   using (is_plan_member((select plan_id from indicators where id = indicator_id)));
 create policy tasks_manager_all on tasks for all to authenticated
   using (is_plan_manager((select plan_id from indicators where id = indicator_id)))
   with check (is_plan_manager((select plan_id from indicators where id = indicator_id)));
 create policy tasks_primary_update on tasks for update to authenticated
-  using (exists(select 1 from task_assignments a where a.task_id = id and a.user_id = auth.uid() and a.role = 'primary'));
+  using (exists(select 1 from task_assignments a where a.task_id = id and a.user_id = auth.uid() and a.role in ('primary','support')));
 
 -- PT-06: المسؤول الرئيس (غير المدير) يحدّث حالة المهمة فقط، لا تفاصيلها
 create or replace function guard_task_primary_update() returns trigger
