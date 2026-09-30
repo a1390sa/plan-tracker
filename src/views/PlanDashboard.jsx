@@ -77,7 +77,8 @@ function TaskRow({ task, cur, me, isManager, members, indicatorName, names, onRe
   const primary = task.assignments.find((a) => a.role === "primary");
   const support = task.assignments.filter((a) => a.role === "support");
   const isPrimaryMe = primary?.user_id === me.id;
-  const canToggle = task.status !== "cancelled" && (isPrimaryMe || isManager);
+  const isSupportMe = support.some((a) => a.user_id === me.id);
+  const canToggle = task.status !== "cancelled" && (isPrimaryMe || isSupportMe || isManager);
 
   const toggleDone = async () => {
     const done = task.status !== "done";
@@ -92,7 +93,7 @@ function TaskRow({ task, cur, me, isManager, members, indicatorName, names, onRe
     <div style={{ borderTop: "1px solid var(--line)", background: st === "late" ? "var(--red-soft)" : "transparent" }}>
       <div className="taskrow">
         <input type="checkbox" checked={task.status === "done"} disabled={!canToggle}
-          title={canToggle ? "تحديث الحالة" : "يحدّثها المسؤول الرئيس أو مدير الخطة"}
+          title={canToggle ? "تحديث الحالة" : "يحدّثها المسؤول الرئيس أو المساند أو مدير الخطة"}
           onChange={toggleDone} style={{ width: 17, height: 17, accentColor: "var(--teal)" }} />
         <div className="grow">
           <div style={{ fontSize: 13, textDecoration: task.status === "done" || task.status === "cancelled" ? "line-through" : "none", color: task.status === "done" ? "var(--mut)" : "var(--ink)" }}>
