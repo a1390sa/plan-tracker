@@ -80,6 +80,21 @@ export default function Settings({ me, onProfileChange }) {
         </div>
       </div>
 
+      <div className="card">
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>الملفات والأدلة</div>
+        <div className="mut" style={{ marginBottom: 12 }}>قوالب جاهزة وأدلة الاستخدام والنشر — تنزيل مباشر بلا أي مصدر خارجي</div>
+        <div className="row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+          {[
+            ["/templates/نموذج_خطة_ابتدائي.xlsx", "القالب الابتدائي الفارغ (Excel)"],
+            ["/docs/دليل_استخدام_النظام.md", "دليل استخدام النظام"],
+            ["/docs/دليل_النشر_والتشغيل.md", "دليل النشر والتشغيل"],
+          ].map(([href, label]) => (
+            <a key={href} className="btn btn-ghost" style={{ textAlign: "right", textDecoration: "none" }}
+              href={href} download target="_blank" rel="noopener noreferrer">⬇ {label}</a>
+          ))}
+        </div>
+      </div>
+
       {me?.is_admin && (
         <div className="card" style={{ padding: 0, overflow: "auto" }}>
           <div style={{ padding: "16px 18px 10px" }}>
